@@ -42,7 +42,7 @@
   "ai_risk": "只写 expire_time > now() 会漏掉永久有效明细",
   "confidence": "high",
   "doc_target": {
-    "path": "docs/VALUE_ACCOUNT_KNOWLEDGE_BASE.md",
+    "path": "docs/PAYMENT_KNOWLEDGE_BASE.md",
     "section": "核心业务规则与隐性约束"
   }
 }

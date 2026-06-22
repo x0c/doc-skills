@@ -452,9 +452,11 @@ def collect_inventory(root: Path, max_files: int) -> dict[str, Any]:
         },
         "extension_summary": [{"extension": k, "count": v} for k, v in ext_counter.most_common(30)],
         "recommended_hidden_semantics_refs": hidden_refs,
+        "depth_scanner_hint": "运行 depth_scanner.py --inventory <本文件> 可获取状态机/并发控制/事件/组件等深层知识候选",
         "notes": [
             "本报告只提供机械候选事实，业务域边界仍需由 Agent 结合代码、资料、数据库和用户输入判断。",
             "entry_candidates 按文件名/路径启发式识别，可能包含误报和漏报。",
+            "深度知识提取（状态枚举/并发模式/事件联动/组件索引）由 depth_scanner.py 单独完成。",
         ],
     }
 
