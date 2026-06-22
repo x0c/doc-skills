@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # 文档治理只读审计 —— 对应 SKILL.md Step 2。
 # 只读、不改任何文件；自动排除第三方 / 构建产物 / 备份 / git 目录。
-# 用法: audit.sh [项目根]   默认当前目录；一次只审计一个项目。
+# 用法: audit.sh [项目根] [--compact-date YYYY-MM-DD]   默认当前目录；一次只审计一个项目。
+#   --compact-date：仅 Step 6 收尾核对压缩账目时传，启用检查 I（逐篇压缩标识硬闸门）；
+#                   Step 2 只读审计阶段不传，跳过该检查。
 #
 # 退出码不表达成败，结论看输出末尾「小结」三个计数与各节 ❌ 行。
 
-PROJ="${1:-.}"
+PROJ="."
+COMPACT_DATE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --compact-date) COMPACT_DATE="$2"; shift 2;;
+    --compact-date=*) COMPACT_DATE="${1#*=}"; shift;;
+    *) PROJ="$1"; shift;;
+  esac
+done
 # 先在 cd 之前算好脚本自身绝对路径，避免后面用相对路径找 doc-init 时被 cd 带偏。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC_INIT_LINT="$SCRIPT_DIR/../../doc-init/scripts/doc_nav_lint.py"
@@ -167,4 +177,29 @@ else
 fi
 
 echo
-echo "==== 小结: 非规范CLAUDE.md=$a 悬空=$b 孤儿=$e 命名违规=${f}（折叠建议=${g_suggest}，doc-init联动=${h}，不计成败）===="
+echo "## I. 压缩标识硬闸门（对应 SKILL.md Step 5/6 逐篇账目；仅 --compact-date 指定时启用）"
+# 范围：docs/ 与 specs/ 下的内容文档（与 E 一致地跳过 README.md 和具名 *_INDEX.md）。
+# 凭据：每篇被 Step 5 处理过的文档末尾应有 `<!-- 该文档整理/压缩于 <COMPACT_DATE> -->`。
+# 缺本轮日期标识 = 本轮漏审，必须补审后才算完成 —— 把「模型自陈都审过了」变成机器可验证。
+i=0
+if [ -n "$COMPACT_DATE" ]; then
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    base=$(basename "$p")
+    [ "$base" = "README.md" ] && continue
+    case "$base" in *_INDEX.md) continue;; esac
+    if ! grep -qF "整理/压缩于 $COMPACT_DATE" "$p"; then
+      echo "  ❌ 缺本轮压缩标识（$COMPACT_DATE）: $p"; i=$((i+1))
+    fi
+  done < <(find docs specs \( $PRUNE \) -prune -o -type f -name '*.md' -print 2>/dev/null)
+  [ "$i" = 0 ] && echo "  ✓ 范围内 docs/specs 文档均带本轮压缩标识（$COMPACT_DATE）"
+else
+  echo "  ⏭ 未指定 --compact-date，跳过（Step 2 只读阶段无需；Step 6 收尾用: audit.sh <项目根> --compact-date $(date +%F)）"
+fi
+
+echo
+if [ -n "$COMPACT_DATE" ]; then
+  echo "==== 小结: 非规范CLAUDE.md=$a 悬空=$b 孤儿=$e 命名违规=${f} 压缩缺标识=${i}（折叠建议=${g_suggest}，doc-init联动=${h}，不计成败）===="
+else
+  echo "==== 小结: 非规范CLAUDE.md=$a 悬空=$b 孤儿=$e 命名违规=${f}（折叠建议=${g_suggest}，doc-init联动=${h}，压缩标识检查未启用，不计成败）===="
+fi

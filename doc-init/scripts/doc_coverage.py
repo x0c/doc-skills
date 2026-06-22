@@ -112,7 +112,8 @@ def parse_map_anchors(section: str, root: Path) -> tuple[list[dict[str, str]], l
             if norm not in seen:
                 seen.add(norm)
                 anchors.append(norm)
-        rows.append({"domain": domain, "anchor_cell": anchor_cell, "anchors": ",".join(row_anchors)})
+        status = cells[2].strip() if len(cells) >= 3 else ""
+        rows.append({"domain": domain, "anchor_cell": anchor_cell, "anchors": ",".join(row_anchors), "status": status})
     # 锚点排序：真实存在的优先，长的优先（更精确）
     anchors.sort(key=lambda a: ((root / a).exists(), len(a)), reverse=True)
     return rows, anchors
@@ -137,6 +138,21 @@ def is_covered(unit: str, anchors: list[str]) -> bool:
         if unit == anchor or unit.startswith(anchor + "/") or anchor.startswith(unit + "/"):
             return True
     return False
+
+
+def entries_under(anchors_csv: str, units: list[str]) -> list[str]:
+    """列出落在该域锚点目录之内的当前代码入口（仅 unit 在 anchor 内，不含反向包含）。
+
+    供漂移点检：把"去抽查已生成域是否漂移"从散文变成"这是该域当前 N 个入口，逐个核对 KB 是否仍匹配"。
+    """
+    row_anchors = [a for a in anchors_csv.split(",") if a]
+    hits: set[str] = set()
+    for u in units:
+        for a in row_anchors:
+            if u == a or u.startswith(a + "/"):
+                hits.add(u)
+                break
+    return sorted(hits)
 
 
 def group_dir(unit: str, depth: int) -> str:
@@ -287,6 +303,20 @@ def main() -> int:
     if verdict == "COMPLETE":
         reasons.append("地图入口锚点覆盖当前代码功能区、且代码量未明显增长，可判定真正完成")
 
+    # 漂移点检清单：对「已生成（复用现有）」域给出当前锚点目录下的入口，供模型逐域核对 KB 是否仍准。
+    reuse_domains: list[dict[str, Any]] = []
+    for row in rows:
+        if "已生成" not in row.get("status", ""):
+            continue
+        ents = entries_under(row["anchors"], units)
+        reuse_domains.append({
+            "domain": row["domain"],
+            "anchors": row["anchors"],
+            "status": row["status"],
+            "entry_count": len(ents),
+            "entries_sample": ents[:8],
+        })
+
     result.update({
         "verdict": verdict,
         "map_present": True,
@@ -301,6 +331,7 @@ def main() -> int:
             "coverage_pct": round(coverage_pct, 4) if coverage_pct is not None else None,
             "uncovered_areas": uncovered_areas,
         },
+        "reuse_domains_for_drift_check": reuse_domains,
         "reasons": reasons,
     })
     emit(result, args.json)
@@ -331,6 +362,14 @@ def emit(result: dict[str, Any], as_json: bool) -> None:
             print("  未覆盖功能区（按入口数降序，模型据此判断是否真实新领域）：")
             for a in cov["uncovered_areas"][:10]:
                 print(f"    - {a['dir']}：{a['entry_count']} 入口，例 {', '.join(a['sample'][:3])}")
+        rd = result.get("reuse_domains_for_drift_check") or []
+        if rd:
+            print("  漂移点检清单（『已生成（复用现有）』域当前入口；逐域核对 KB 标注入口是否仍落得到实处、有无成片新增未登记入口）：")
+            for d in rd:
+                line = f"    - {d['domain']}（{d['anchors'] or '无锚点'}）：当前 {d['entry_count']} 入口"
+                if d["entries_sample"]:
+                    line += f"，例 {', '.join(d['entries_sample'][:3])}"
+                print(line)
     print("判定理由：")
     for r in result["reasons"]:
         print(f"  - {r}")
