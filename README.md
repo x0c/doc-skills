@@ -1,6 +1,10 @@
 # doc-skills
 
-A set of [Claude Code](https://claude.ai/code) skills for bootstrapping and maintaining AI-readable project documentation systems.
+> **Claude Code Skills** for bootstrapping, compacting, and maintaining AI-readable project documentation — so coding agents stop re-discovering the same project context every session.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skills-5A67D8?logo=anthropic&logoColor=white)](https://claude.ai/code)
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)](https://python.org)
 
 **Languages:** [English](#english) | [中文](#中文)
 
@@ -12,6 +16,18 @@ A set of [Claude Code](https://claude.ai/code) skills for bootstrapping and main
 ### Why this exists
 
 AI coding agents waste time (and make mistakes) re-discovering the same project context every session: which module owns what, which fields lie, which side effects aren't visible in the code. `doc-skills` turns that tribal knowledge into a small, navigable documentation system that any agent can pick up cold — and keeps it from rotting as the codebase changes.
+
+### Quick Install
+
+```bash
+# Clone into your Claude Code skills directory
+git clone https://github.com/x0c/doc-skills.git ~/.claude/skills/doc-skills
+
+# Or copy individual skill folders if you only need one
+cp -r doc-skills/doc-init ~/.claude/skills/
+```
+
+Restart Claude Code. Each skill's entry point is its `SKILL.md`.
 
 ### Skills
 
@@ -80,6 +96,18 @@ MIT
 ### 为什么需要它
 
 AI Coding Agent 每次接手项目都要重新摸清同一套上下文——哪个模块归谁管、哪些字段名不能按字面理解、哪些副作用代码里根本看不出来。这些只有老手才知道的经验如果不落盘，就只能靠 Agent 一次次重新踩坑。`doc-skills` 把这些经验沉淀成一套小而精、可导航的文档体系，让任何 Agent 接手都能直接开工，并且随代码演进持续保鲜，而不是写完就过期。
+
+### 快速安装
+
+```bash
+# 克隆到 Claude Code skills 目录
+git clone https://github.com/x0c/doc-skills.git ~/.claude/skills/doc-skills
+
+# 或只复制需要的 skill
+cp -r doc-skills/doc-init ~/.claude/skills/
+```
+
+重启 Claude Code 即可使用，每个 skill 的入口是其 `SKILL.md`。
 
 ### Skills 说明
 
