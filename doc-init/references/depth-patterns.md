@@ -8,6 +8,15 @@
 
 ## 7 个通用提取模式
 
+### 通用提取流程（每个模式共用）
+
+所有模式的提取共享以下步骤，各模式段落只补充该模式特有的确认要点：
+
+1. 从 `depth_scanner.py` 对应输出字段收集原始信号（字段映射见文件末「从 depth_scanner.py 输出到 KB 的映射规则」）
+2. 阅读代码确认信号真实性——误报丢弃并在 §9 说明
+3. 记录关键属性（每个模式要求不同，见下方各模式「确认要点」）
+4. 写入 KB 对应 section（映射见文件末映射表），每条标注代码证据
+
 ### a) 状态机提取
 
 **适用 KB section**：§2 核心流程 / 状态机
@@ -17,23 +26,11 @@
 - 存在「只有在 A 状态才能执行 B 操作」的条件校验
 - 存在「执行 C 操作后必然变为 D 状态」的写入逻辑
 - 存在终态（进入后无法自然变化、只能被特殊操作干预）
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `enum OrderStatus`、`statusEnum`、`BizStatus`、`.eq(status, X)` 查询条件、`Assert.isTrue(entity.getStatus() == X)`、`@PostUpdate` / `@PreUpdate` 钩子 |
-| Python | `status = models.CharField(choices=...)`、`@transition(field=status, source=X, target=Y)`（django-fsm）、`if obj.state not in ALLOWED_STATES` |
-| TypeScript/JS | `state: 'pending' \| 'active' \| 'closed'`、`xstate` / `robot` machine config、`switch(entity.status)` + throw |
-| Go | `const (StatusPending Status = iota ...)`、`if s.state != StateReady { return ErrInvalidState }` |
-| C#/.NET | `enum OrderState`、`[Flags]`、`switch(entity.State)` + 异常、Stateless / Appccelerate.StateMachine |
-
-**提取方法**：
-1. 收集所有「状态/阶段」枚举或常量（`depth_scanner.py` 的 `status_patterns`）
-2. 对每个状态值：grep 它被写入的方法名（= 触发转换的操作）
-3. grep 它被读取用于前置校验的位置（= 转换前置条件）
-4. 画出：`状态A --[操作]--前置条件--> 状态B`，标注终态
-5. 写入 KB §2，用简明列表或表格；附代码索引（类名 + 行号）
+**确认要点**：
+- 对每个状态值：grep 被写入的方法名（= 触发转换的操作）和被读取的前置校验位置（= 转换前置条件）
+- 产出格式：`状态A --[操作]--前置条件--> 状态B`，标注终态
 
 **AI 易错点**：不提取状态机时，AI 会在错误的状态下触发操作（如对已注销实体执行冻结），导致数据一致性问题，且这类 bug 只在特定状态流下才会触发。
 
@@ -49,23 +46,11 @@
 - 存在重试逻辑包裹的并发冲突异常捕获
 - 存在基于 CAS 的 update（`WHERE version = ?`，更新行数校验）
 - 存在幂等写入后再加锁（先加锁后查 + 写的双重检查）
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `@Version`、`OptimisticLockingFailureException`、`redisTemplate.opsForValue().setIfAbsent`、`SELECT FOR UPDATE`、`@Lock(LockModeType.PESSIMISTIC_WRITE)` |
-| Python | `select_for_update()`（Django）、`redis.set(key, value, nx=True, ex=ttl)`、`retry_on_conflict`、`__version__`（SQLAlchemy） |
-| TypeScript/JS | `$transaction`（Prisma）、`redis.set(key, value, 'NX', 'EX', ttl)`、`mongoose` `__v` 字段、Sequelize `version: true` |
-| Go | `sync.Mutex`、`sync.RWMutex`、`singleflight`、`WHERE version = $n` 更新行数检查、Redis `SET NX EX` |
-| C#/.NET | `[ConcurrencyCheck]` / `[Timestamp]`（EF）、`IsolationLevel.Serializable`、`StackExchange.Redis.SetAddAsync ... NX` |
-
-**提取方法**：
-1. 收集 `depth_scanner.py` 的 `concurrency_patterns`
-2. 对每条信号：确认它保护的是哪个实体 / 哪个操作
-3. 记录：锁粒度（对象级 / 操作级 / 全局）、锁范围（TTL / 事务边界）、锁 key 构造规则
-4. 注明：加锁失败的处理（抛异常 / 重试 / 幂等返回）
-5. 写入 KB §6，每条标注 **AI 易错点**
+**确认要点**：
+- 确认锁保护的实体/操作、锁粒度（对象级/操作级/全局）、锁范围（TTL/事务边界）、锁 key 构造规则
+- 注明加锁失败的处理（抛异常/重试/幂等返回）
 
 **AI 易错点**：不识别并发控制时，AI 会引入：① 去掉锁后的竞态条件（高并发下余额负数、状态覆盖）；② 在锁保护范围外读取被锁变量导致脏读；③ 修改锁 key 构造规则导致锁失效但不报错。并发 bug 在本地单线程测试中不会复现。
 
@@ -80,22 +65,11 @@
 - 写操作前先查「是否已存在」，命中则直接返回已有结果
 - 唯一约束（数据库 / 内存）兜底防重复插入，并有对应的冲突捕获逻辑
 - 操作完成后写入幂等记录表或 Redis key
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `UNIQUE INDEX` + catch `DuplicateKeyException`、`insertOrIgnore`、`selectOne(Wrappers.eq("trade_no", x))`、`@Idempotent` 自定义注解 |
-| Python | `get_or_create()`（Django）、unique_together、`try/except IntegrityError`、`INSERT ... ON CONFLICT DO NOTHING` |
-| TypeScript/JS | `upsert`（Prisma）、`findOrCreate`（Sequelize）、`insertIgnore`（Knex）、Redis `SETNX` |
-| Go | `INSERT ... ON CONFLICT DO NOTHING`、`errors.Is(err, ErrAlreadyExists)`、幂等记录表查重 |
-| C#/.NET | `AddOrUpdate`（ConcurrentDictionary）、`INSERT ... ON CONFLICT`、EF `AddIfNotExists` 模式 |
-
-**提取方法**：
-1. 搜索写操作入参中的「流水号」字段命名规律
-2. 确认「先查后写」是否有完整的命中即返回逻辑（而非每次新建）
-3. 确认是否依赖数据库唯一索引兜底，以及异常处理是否正确（不能吞掉异常）
-4. 写入 KB §6：说明幂等 key 来源、防重机制、命中后的返回语义
+**确认要点**：
+- 确认幂等 key 来源（入参字段命名规律）、「先查后写」是否有命中即返回逻辑
+- 确认是否依赖数据库唯一索引兜底及异常处理是否正确
 
 **AI 易错点**：不识别幂等时，AI 会：① 去掉「先查后写」的查询步骤导致重复写入；② 修改幂等 key 字段导致同一请求被多次执行；③ 在改写操作后忘记同步更新幂等记录，导致重试返回旧结果。
 
@@ -111,23 +85,12 @@
 - 存在拦截器 / 插件 / 中间件负责将逻辑表名改写为物理表名
 - 多处显式 `tenantId`、`shardKey`、`settingId` 传参，或 ThreadLocal / 上下文中隐式注入
 - 存在全局表（不分表）与分表共存，有白名单或排除列表
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `@TableName` + MyBatis 插件改写、`BusinessContextHolder.set()`、`ShardingKey`、`TenantContext`、ShardingSphere / `dynamic-datasource` |
-| Python | `using(db=tenant_db)`（Django）、schema 切换、`set_tenant()`、custom DB router |
-| TypeScript/JS | Prisma `$extends`、TypeORM `setSchema`、分库中间件、`cls-hooked` 注入 tenantId |
-| Go | GORM `Table(tableName)`、context 注入 tenantId、分库分表中间件（gorm-sharding） |
-| C#/.NET | EF 动态 schema、`IHttpContextAccessor` 注入 tenantId、ABP Framework 多租户 |
-
-**提取方法**：
-1. 找到路由逻辑核心入口（拦截器 / 插件 / 上下文 set 点）
-2. 枚举：哪些表是分表、哪些是全局表（禁止分表）
-3. 记录：分片键来源（入参 / ThreadLocal / 请求头）、切换时机、重置时机
-4. 写入 KB §6：分表域范围 + 禁止加入分表的全局表 + 切换方式
-5. 写入 KB §7：查询分表数据时需指定物理后缀的 curl / SQL 示例
+**确认要点**：
+- 找到路由逻辑核心入口（拦截器/插件/上下文 set 点）
+- 枚举哪些表是分表、哪些是全局表（禁止分表）
+- 记录分片键来源（入参/ThreadLocal/请求头）、切换时机、重置时机
 
 **AI 易错点**：不识别分表路由时，AI 会：① 查基表（模板表）误以为无数据；② 不设上下文直接调用 Service 导致路由错误或报错；③ ALTER TABLE 只改了基表，未同步到物理分表；④ 把全局配置表错误加入分表初始化，导致路由乱跳。
 
@@ -142,23 +105,12 @@
 - 存在异步事件（`ApplicationEventPublisher.publishEvent`、`@EventListener`、`EventEmitter.emit`）
 - 存在 Webhook 回调处理（接收外部事件）
 - 存在定时任务触发后续业务流程
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `rabbitTemplate.convertAndSend`、`@RabbitListener`、`kafkaTemplate.send`、`@KafkaListener`、`ApplicationEventPublisher`、`@EventListener`、`@TransactionalEventListener` |
-| Python | Celery `@app.task`、Django signals `post_save.connect`、`pika` / `confluent_kafka` producer/consumer |
-| TypeScript/JS | `EventEmitter`、`Bull` / `BullMQ` queue、`amqplib`、`kafkajs`、NestJS `@EventPattern`、`@MessagePattern` |
-| Go | `channel` 异步传递、NATS / Kafka / RabbitMQ client、cron job `github.com/robfig/cron` |
-| C#/.NET | `MassTransit`、`NServiceBus`、`IMediator.Publish`（MediatR）、Hangfire `BackgroundJob.Enqueue` |
-
-**提取方法**：
-1. 收集 `depth_scanner.py` 的 `event_patterns`
-2. 对每个 producer：记录 topic/event type、携带数据结构、触发时机（哪个操作后）
-3. 对每个 consumer：记录订阅的 topic/event type、处理逻辑入口、失败策略（重试 / 死信）
-4. 识别跨域联动：producer 在 A 域，consumer 在 B 域 → 跨域联动候选
-5. 写入 §5：事件矩阵（触发域、topic、消费域、处理入口）；跨域的写入跨域联动候选说明
+**确认要点**：
+- 对每个 producer：记录 topic/event type、携带数据结构、触发时机
+- 对每个 consumer：记录订阅的 topic/event type、处理逻辑入口、失败策略
+- 识别跨域联动：producer 在 A 域，consumer 在 B 域
 
 **AI 易错点**：不识别事件驱动时，AI 会：① 以为删除 A 域实体只影响 A 域，漏掉 B 域的 consumer 级联处理；② 以为操作是同步完成，但实际结果需等消息消费后才落库；③ 把 producer 和 consumer 在不同服务视为无关代码，修改一方接口但不更新另一方。
 
@@ -173,23 +125,13 @@
 - 存在专门的 DSL 解析器 / 转换器类（`*Parser`、`*Converter`、`*Resolver`、`*Deserializer`）
 - 存在枚举驱动的格式分支（`switch(type)` 决定如何解析同一字段）
 - 规则引擎 / 流程引擎的条件和参数以结构化数据存储在数据库中
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `JsonNode`、`ObjectMapper.readValue`、`@JsonTypeInfo`、`@JsonSubTypes`、`JdbcType`、TypeHandler |
-| Python | `json.loads(field_value)`、`pydantic.parse_obj`、`jsonschema.validate`、Django `JSONField` |
-| TypeScript/JS | `JSON.parse()`、`zod.parse()`、`ajv.validate()`、Prisma `Json` 类型、TypeORM `type: 'jsonb'` |
-| Go | `json.Unmarshal`、`encoding/json`、结构体 tag `json:"field,omitempty"`、自定义 `UnmarshalJSON` |
-| C#/.NET | `JsonSerializer.Deserialize`、`Newtonsoft.Json`、`System.Text.Json`、EF value converter |
-
-**提取方法**：
-1. 找到解析器入口，反向追踪它处理的数据库字段或入参字段
-2. 列出所有 `type` 枚举值，对每个值说明格式要求（必填字段、值域、嵌套结构）
-3. 若有格式版本（v1/v2），说明版本区分字段和兼容逻辑
-4. 提取典型合法样本（JSON / YAML 片段）写入 KB §6
-5. 注明：哪些字段 null 合法、哪些 null 会静默报错（最常见坑）
+**确认要点**：
+- 找到解析器入口，反向追踪处理的数据库字段或入参字段
+- 列出所有 `type` 枚举值，对每个值说明格式要求（必填字段、值域、嵌套结构）
+- 若有格式版本（v1/v2），说明版本区分字段和兼容逻辑
+- 提取典型合法样本（JSON/YAML 片段）；注明哪些字段 null 合法、哪些 null 会静默报错
 
 **AI 易错点**：不提取 DSL 格式时，AI 会：① 生成不符合格式的数据导致解析异常（且报错不指向格式问题而是业务逻辑深处）；② 漏填必须但无 `@NotNull` 约束的字段导致运行时 NPE；③ 在新功能中存入旧格式版本，触发版本兼容问题。
 
@@ -204,22 +146,12 @@
 - 查询方法默认过滤已删除记录（框架级 `@Where`、插件级拦截、手动 `.ne("status", DELETED)`）
 - 部分查询场景需要查到「已删除」记录（如审计、级联清理、查历史）
 - 存在同一外键有多条记录只有一条「活跃」的情况（软删除 + 新建替代旧版本）
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `@TableLogic`（MyBatis-Plus）、`@Where(clause = "deleted = 0")`（Hibernate）、`.ne(BizStatus, DELETED)` |
-| Python | `SoftDeleteQuerySet`、`objects.filter(is_deleted=False)`、django-safedelete、`deleted_at__isnull=True` |
-| TypeScript/JS | Prisma `where: { deletedAt: null }`、TypeORM `@DeleteDateColumn`、Sequelize `paranoid: true` |
-| Go | `db.Where("deleted_at IS NULL")`（GORM `soft_delete`）、手动 `AND is_deleted = 0` |
-| C#/.NET | EF `HasQueryFilter(e => !e.IsDeleted)`、`ISoftDelete` 接口、全局过滤器 |
-
-**提取方法**：
-1. 找到软删除字段和框架级 / 全局过滤器
-2. 搜索「绕过默认过滤」的场景（`Unscoped()`、`withDeleted()`、手动 `includeDeleted`）
-3. 梳理：哪些查询场景必须包含已删除记录（级联清理、幂等查重、审计溯源）
-4. 写入 KB §6：说明过滤默认行为、绕过方式、各查询场景的过滤口径
+**确认要点**：
+- 找到软删除字段和框架级/全局过滤器
+- 搜索「绕过默认过滤」的场景（`Unscoped()`、`withDeleted()`、手动 `includeDeleted`）
+- 梳理哪些查询场景必须包含已删除记录（级联清理、幂等查重、审计溯源）
 
 **AI 易错点**：不识别软删除时，AI 会：① 在幂等查重时查不到已软删除的同 key 记录，导致重复创建；② 级联清理时忘记处理已软删除的子实体，留下孤儿数据；③ 直接 `DELETE FROM` 物理删除，绕过业务状态流转。
 
@@ -235,22 +167,11 @@
 - NULL 值有特殊业务含义（不是"未设置"而是"永久/无限/默认"）
 - 字段类型与直觉不符（如 `Integer` 存储的是枚举 code 而非数值、`String` 存储 JSON 而非文本）
 - `logic_id` / `version` / `biz_status` 等有隐式框架行为的字段
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `@TableField(fill = FieldFill.INSERT)` 自动填充、`@Version` 乐观锁、`@TableLogic` 逻辑删除、`@TableName` 实体类有多个同名字段（如多处 `tid`）、字段注释与实际行为不一致 |
-| Python | `default=None` 但 None 有业务语义、`ForeignKey` 名与实际指向不一致、`verbose_name` 与实际用途偏差 |
-| TypeScript/JS | `@Column({ nullable: true })` 但 null 有语义、TypeORM relation 名与实际实体不匹配 |
-| Go | 同名 struct tag 在不同 struct 中映射到不同列、`json:"-"` 隐藏的字段在 DB 中有值 |
-| C#/.NET | `[NotMapped]` 字段有计算逻辑、`[Column("real_name")]` 字段映射名与属性名不同 |
-
-**提取方法**：
-1. 从 `depth_scanner.py` 的 `entity_fields` 输出中找到主实体的所有字段
-2. 对每个字段检查：① 名称是否在多个实体中出现但含义不同？② 是否允许 NULL 且 NULL 有业务语义？③ 类型是否有隐式行为（乐观锁/自动填充/逻辑删除）？④ 是否是外键但命名暗示的指向与实际指向不一致？
-3. 将确认的陷阱写入 §6 并标 **AI 易错点**；字段完整列表写入 §4
-4. 特别关注：多个表共享同名字段但语义不同（如 `tid` 在主表是标识号、在流水表是流水号）——这类在代码补全时极易被 AI 混用
+**确认要点**：
+- 对每个字段检查：① 多实体同名但含义不同？② NULL 有业务语义？③ 有隐式框架行为（乐观锁/自动填充/逻辑删除）？④ 外键命名暗示指向与实际不一致？
+- 特别关注多表共享同名字段但语义不同的情况（代码补全时极易混用）
 
 **AI 易错点**：不提取字段语义时，AI 会：① 写 SQL 查询时用 `WHERE expire_time > NOW()` 漏掉 NULL=永久有效的记录；② 在不同 Service 间传递同名字段时混淆含义（如把"客户 TID"传给期望"流水 TID"的接口）；③ 删除或修改有隐式框架行为的字段（如去掉 `@Version` 注解导致并发失控）。
 
@@ -265,23 +186,13 @@
 - 存在 TypeHandler / ValueConverter / 自定义序列化器将 DB 字段转为 DTO 对象
 - 字段的合法结构由枚举 `type` 字段路由到不同的子格式
 - 存在"格式不对时静默失败"的解析逻辑（try-catch 吞异常返回 null/空对象）
+- 各语言专项信号见文件末「语言变体信号汇总表」
 
-**语言变体信号**：
-
-| 语言栈 | 信号举例 |
-|--------|----------|
-| Java/Kotlin | `JSON.parseObject(field, XxxDTO.class)`、`@TableField(typeHandler = JacksonTypeHandler.class)`、`ObjectMapper.readValue`、`@Convert(converter = ...)`、`JsonNode` 字段 |
-| Python | `JSONField()`（Django）、`json.loads(self.config_field)`、Pydantic model 从 `str` 列解析 |
-| TypeScript/JS | `JSON.parse(entity.configColumn)` → typed object、Prisma `Json` 类型、`@Column({ type: 'jsonb' })` |
-| Go | `json.Unmarshal([]byte(field), &struct{})`、`gorm:"type:jsonb"` tag |
-| C#/.NET | `[Column(TypeName = "jsonb")]` + 自定义 ValueConverter、`JsonSerializer.Deserialize<T>(field)` |
-
-**提取方法**：
-1. 从 `depth_scanner.py` 的 `json_field_patterns` 获取候选字段列表
-2. 对每个命中字段：追踪其反序列化目标类型（DTO/record/struct），列出所有字段含义和值域
-3. 确认：① 哪些子字段必填（缺失会 NPE/异常）？② 枚举 `type` 字段的全部合法值？③ NULL 是否合法（整个 JSON 列为 null vs JSON 内某个 key 为 null）？④ 是否有格式版本兼容逻辑？
-4. 写入 §6：给出一个"最小合法样本"JSON 片段 + "缺失关键字段时的报错表现"
-5. 重点标注：哪些字段"前端漏传导致 Jackson 反序列化为 null，但代码不校验直接用"——这是最常见的运行时 NPE 来源
+**确认要点**：
+- 追踪反序列化目标类型（DTO/record/struct），列出所有字段含义和值域
+- 确认：① 哪些子字段必填（缺失会 NPE）？② 枚举 `type` 全部合法值？③ NULL 是否合法？④ 有格式版本兼容？
+- 给出"最小合法样本"JSON + "缺失关键字段时的报错表现"
+- 重点标注"前端漏传导致反序列化为 null，但代码不校验直接用"的字段
 
 **AI 易错点**：不提取 JSON 字段格式时，AI 会：① 生成不符合格式的数据（如漏掉必填的 `type` 字段导致解析分支走到 default/null）；② 在 DB 中直接 UPDATE JSON 字段时破坏结构（如把数组格式写成对象格式）；③ 新增功能时在 JSON 中加字段但未同步修改反序列化 DTO，导致字段被静默丢弃。
 

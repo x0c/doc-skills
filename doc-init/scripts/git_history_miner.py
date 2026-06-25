@@ -31,7 +31,6 @@ DEFAULT_EXCLUDED_PATH_PARTS = {
     ".claude",
     ".agents",
     ".codex",
-    ".gitnexus",
     ".codegraph",
     "target",
     "build",

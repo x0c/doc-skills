@@ -43,18 +43,7 @@
 - 跨领域共享的运行时机制，例如 AOP / Middleware 链、缓存一致性、MQ 重试、分库分表路由、权限拦截，写入对应 Guide。
 - 历史事故或一次性排障过程，不由 doc-init 伪造；后续由 `doc-update` 或 troubleshooting 文档沉淀。
 
-运行时业务证据分流：
-
-| 运行时看到的证据 | 默认落档 |
-|---|---|
-| 实际路由 / API 清单、Swagger、Actuator mappings、Django urls、Nest routes、.NET endpoints | 领域 KB 的代码/接口入口 |
-| 实际生效配置、profile、环境变量、配置中心、feature flag、租户配置、灰度开关 | 领域 KB 隐性约束；跨领域配置机制进 Guide |
-| DI / Bean / Middleware / AOP / Filter 链 | 公共 Guide；只影响单域时写该 KB |
-| 真实 SQL、字段条件、排序、分库分表路由 | 领域 KB 表字段入口和验证路径 |
-| MQ / Job 注册、consumer group、topic、定时任务、失败重试策略 | 领域 KB 事件入口；公共机制进 Guide |
-| Redis key、TTL、缓存穿透条件、缓存和 DB 一致性边界 | 领域 KB 或缓存 Guide |
-| 权限真实行为、前端隐藏和后端拦截差异 | 领域 KB 权限约束；权限机制进 Guide |
-| 调用接口后的表变化、状态字段、日志、消息、副作用 | 领域 KB 流程/状态机和验证路径 |
+运行时业务证据分流详细规则见 `multi-source-evidence.md`「运行时证据分流」节。Operations 只保留启动/环境/探活类内容。
 | 非法参数错误码、校验规则、异常包装 | 领域 KB 边界条件和验证路径 |
 | 链路追踪 / 日志反推的核心调用链 | 领域 KB 或跨领域链路 Guide |
 
