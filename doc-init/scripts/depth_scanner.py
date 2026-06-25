@@ -40,7 +40,6 @@ IGNORE_DIRS = {
     ".claude",
     ".agents",
     ".codex",
-    ".gitnexus",
     ".codegraph",
     ".gradle",
     ".mvn",

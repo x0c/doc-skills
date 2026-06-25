@@ -43,6 +43,8 @@ description: 项目文档体系初始化。先检查并修复全局 AI 指令文
 
 若均不存在，报告并询问用户路径后继续。
 
+**禁止**把当前项目的 `AGENTS.md` 传给 `insert_doc_governance.py`——只处理上方列出的全局文件。
+
 ### Step 2 — 脚本校验并自动插入/升级
 
 对每个真身文件运行：
@@ -113,11 +115,7 @@ python3 <DOC_INIT_DIR>/scripts/doc_coverage.py --root . --inventory .doc-init-pr
 
 读取 `references/human-intake.md`。
 
-**Step 7a：先确立产品北极星**，确立顺序：
-1. 读项目已有根 `AGENTS.md`，跟随其产品指针（哪怕指向跨仓的 PRD/路线图）。
-2. 读用户提供或项目内的 PRD/北极星/路线图/设计稿。
-3. 以上都没有 → 向用户征询一句话产品定义：做什么、给谁、核心循环。
-4. 仍拿不到（用户已禁止提问）→ **硬卡停下**，告知"缺产品权威来源，需要你一句话说清产品是什么才能继续"，不进入 Step 8。
+**Step 7a：先确立产品北极星**——按 `human-intake.md`「产品北极星先行」流程确立（① 项目 AGENTS.md 产品指针 → ② PRD/路线图 → ③ 征询用户 → ④ 硬卡停下）。
 
 **确认真相后就地修正冲突文档**：任何阶段确立的真相若与 `docs/` 已有文档相冲突，必须在当次会话内改正，不允许同时留两份矛盾结论。裁定、防拉锯、传播规则详见 `references/conflict-resolution.md`。
 
@@ -172,23 +170,7 @@ python3 <DOC_INIT_DIR>/scripts/depth_scanner.py --root . --inventory .doc-init-p
 
 **第一步：展示领域地图全景 + 确认边界划分**
 
-先用纯文本输出完整领域地图（一屏可读），格式：
-
-```
-领域地图（共 N 个）：
-
-已有文档覆盖（A 个，不重写）：
-  • [领域A] — docs/A_KNOWLEDGE_BASE.md
-  • [领域B] — docs/B_GUIDE.md
-
-本次深写（M 个）：
-  1. [领域C] — 理由：Git 热点 Top 1 / 产品核心循环
-  2. [领域D] — 理由：用户 Intake 点名
-
-Backlog（K 个）：
-  • [领域E] — 入口锚点：xxx/
-  • [领域F] — 入口锚点：yyy/
-```
+先用纯文本输出完整领域地图（一屏可读），按三段分组：`已有文档覆盖（A 个）` → `本次深写（M 个，含理由）` → `Backlog（K 个，含锚点）`。
 
 然后用结构化选择工具提问：
 
@@ -247,7 +229,7 @@ Backlog（K 个）：
 python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py --root . --path docs/<DOMAIN>_KNOWLEDGE_BASE.md --when-to-read "<任务触发句>"
 ```
 
-`--when-to-read` 触发句要覆盖该领域**全部任务类型**（修改/新建/评审/排查/优化），不要只写「改 X 前」。
+`--when-to-read` 只写该文档覆盖的业务范围关键词（如「客户资料变更、状态流转、标签批量操作」），不要每条都重复「改、评审或排查…前必读」——通用触发模式应在导航段表头统一声明一次。
 
 **登记 backlog**（主批写完后，把所有待补充领域全部登记，不得静默丢弃）：
 
