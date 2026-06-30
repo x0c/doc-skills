@@ -1,7 +1,6 @@
 ---
 name: doc-update
 description: 会话复盘：将可复用的发现更新到 skill 或项目 docs，同步代码变动导致的文档失效。Use at end of session to persist reusable findings to docs.
-disable-model-invocation: true
 ---
 
 ## 核心目标
