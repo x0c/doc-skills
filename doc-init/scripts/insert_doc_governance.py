@@ -18,7 +18,7 @@
 import sys
 import re
 
-CURRENT_VERSION = 4
+CURRENT_VERSION = 5
 
 STANDARD = f"""## 项目文档管理
 <!-- doc-governance-version: {CURRENT_VERSION} -->
@@ -31,6 +31,7 @@ STANDARD = f"""## 项目文档管理
 * 禁止用内置记忆功能，需要持久化的知识必须写入项目文档。
 * 除 `README.md` 外，所有项目文档默认使用中文。
 * 项目根 `CLAUDE.md` 默认只能保留一行：`@AGENTS.md`
+* 新建或首次接手项目时，检查全局 AI 指令文件中是否声明了跨项目技术规范文档的位置；声明存在时按项目主语言/技术栈查找匹配文档，找到则在项目根 `AGENTS.md` 顶部建立引用（未声明该位置约定则跳过，不臆造路径）。
 
 ### 2. 文档导航
 
