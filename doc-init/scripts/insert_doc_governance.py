@@ -18,7 +18,7 @@
 import sys
 import re
 
-CURRENT_VERSION = 6
+CURRENT_VERSION = 7
 
 STANDARD = f"""## 项目文档管理
 <!-- doc-governance-version: {CURRENT_VERSION} -->
@@ -125,6 +125,8 @@ STANDARD = f"""## 项目文档管理
 | 跨项目通用模式 / 检查清单 / 脚本 | 对应 skill 文件 |
 | 项目级行为规范 / 约束 / 强制流程 | 项目根 `AGENTS.md` |
 | 项目业务规则 / 架构 / 领域知识 / 代码变动导致已有文档失效 | `docs/` 中的文档 |
+
+**收工复盘落盘方式**：本会话产生了可复用发现（新业务规则、踩坑经验、验证有效的模式、用户长期偏好），或代码变动导致已有文档失效时，**必须调用 `doc-update` skill 执行复盘落盘**（由它负责信号召回、去重判定、文档归位、索引同步与输出摘要），不得仅凭记忆判断「文档已是最新」；若 `doc-update` 判定无需更新，按其输出「本次无需更新」收工即可。
 """
 
 VERSION_RE = re.compile(r"<!--\s*doc-governance-version:\s*(\d+)\s*-->")
