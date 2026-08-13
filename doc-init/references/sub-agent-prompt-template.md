@@ -151,7 +151,7 @@ JSON 字段（→ §6 格式规范）：
   4. 从 Step 9 Q&A 中取与 D 相关的问答对
   5. 从其他域的边界报告中提取与 D 有交互的接口
   6. 用上述模板组装完整 prompt
-  7. 派遣 sub-agent(prompt, model="sonnet")
+  7. 派遣 sub-agent(prompt)（默认继承父模型，勿额外指定 model）
 ```
 
 ---

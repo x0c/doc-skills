@@ -70,13 +70,13 @@ Audits and compresses project documentation without losing behavioral informatio
 
 1. **Global governance check** — same as `doc-init` Phase 1; ensures the instruction file is current before restructuring anything.
 
-2. **Read-only audit** — `audit.sh` runs a battery of mechanical checks: CLAUDE.md single-line convention, dead links, orphan documents (files in `docs/` not reachable from root `AGENTS.md`), naming convention violations, and — crucially — detection of the `doc-init` domain map segment (which must be preserved untouched through all compaction).
+2. **Read-only audit** — `audit.py` runs a battery of mechanical checks: CLAUDE.md single-line convention, dead links, orphan documents (files in `docs/` not reachable from root `AGENTS.md`), naming convention violations, and — crucially — detection of the `doc-init` domain map segment (which must be preserved untouched through all compaction).
 
 3. **Two-level index decision** — by default, documentation stays flat (everything reachable from root `AGENTS.md` in one hop). A second-level index is only introduced when the navigation section itself has grown large enough to crowd out the behavioral rules. Two independent triggers: scale-driven (navigation takes up ≥ half of `AGENTS.md`) and type-driven (≥ 3 troubleshooting records or review logs).
 
 4. **Structure repair** — fixes mechanical issues: CLAUDE.md back to single line, document naming to `SCREAMING_SNAKE_CASE` (knowledge bases) or `kebab-case` (design/review docs), navigation descriptions rewritten from "what this file contains" to "when you should read this", dead index entries removed.
 
-5. **Compression (the core step)** — every document in `docs/` is reviewed against a graded set of deletion criteria. Low-risk removals (paraphrase, dead links, historical changelog, duplicate reminders, line-number references that should be method-name anchors) are done directly. High-risk removals (entire files, paragraphs with numbers or boundary conditions, structural changes) are listed for confirmation first. A `<!-- compressed YYYY-MM-DD -->` marker is written to every processed file, which becomes a hard gate in the final audit: any file missing the marker means it was skipped.
+5. **Compression (the core step)** — every document in `docs/` is reviewed against a graded set of deletion criteria. Low-risk removals (paraphrase, dead links, historical changelog, duplicate reminders, line-number references that should be method-name anchors) are done directly. High-risk removals (entire files, paragraphs with numbers or boundary conditions, structural changes) are listed for confirmation first. A `<!-- compressed YYYY-MM-DD -->` marker is written to every processed file, which becomes a hard gate in the final audit: any file missing the marker means it was skipped. When the corpus exceeds one sub-agent's token budget, Step 5 is sharded **by domain** (not by directory); the parent agent only aggregates per-file ledgers and runs cross-shard drift checks.
 
 Use when docs are bloated, indexes break, `AGENTS.md` balloons past ~200 lines, or `CLAUDE.md` gets polluted with content.
 
@@ -175,7 +175,7 @@ doc-compact/
 │   ├── compression-guide.md        # compression criteria, risk grades, repair scripts
 │   └── standard.md                 # the eleven quality standards with full explanation
 └── scripts/
-    └── audit.sh                    # mechanical audit (dead links, naming, markers)
+    └── audit.py                    # mechanical audit (dead links, naming, markers)
 
 doc-update/
 └── SKILL.md
@@ -246,10 +246,10 @@ cp -r doc-skills/doc-init doc-skills/doc-compact doc-skills/doc-update ~/.claude
 五步流水线：
 
 1. **全局规范校验** — 重整结构前先确认指令文件是最新版。
-2. **只读审计** — `audit.sh` 检查 CLAUDE.md 单行约定、死链、孤儿文档、命名规范，以及 `doc-init` 领域地图段（必须原样保留）。
+2. **只读审计** — `audit.py` 检查 CLAUDE.md 单行约定、死链、孤儿文档、命名规范，以及 `doc-init` 领域地图段（必须原样保留）。
 3. **二级索引判定** — 默认平铺，只有导航段膨胀到挤压行为规则时才引入二级索引。
 4. **结构修复** — CLAUDE.md 还原单行、文档命名规范化、导航描述改写为"带着什么任务该读它"。
-5. **压缩（核心步骤）** — 逐篇过删除判据，低风险直接删，高风险先列清单确认，每篇写入压缩标记作为硬闸门。
+5. **压缩（核心步骤）** — 逐篇过删除判据，低风险直接删，高风险先列清单确认，每篇写入压缩标记作为硬闸门。文档总量超出单个 sub-agent token 预算时，Step 5 **按领域分片**（不按物理目录），主 agent 只汇总逐篇账目并做跨片漂移回检。
 
 适用场景：文档膨胀、索引失效、`AGENTS.md` 超过约 200 行、`CLAUDE.md` 被混入杂质内容时。
 
@@ -328,7 +328,7 @@ doc-compact/
 │   ├── compression-guide.md          # 压缩判据、风险分级、修复脚本
 │   └── standard.md                   # 十一条质量标准完整说明
 └── scripts/
-    └── audit.sh                      # 机械审计脚本
+    └── audit.py                      # 机械审计脚本
 
 doc-update/
 └── SKILL.md
