@@ -200,19 +200,21 @@ date_re = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 review_re = re.compile(r"^.+-review\.md$")
 space_re = re.compile(r" ")
 
-# troubleshooting 下的排查记录
+# troubleshooting 下的排查记录（具名 *_INDEX.md / README 合法，跳过）
 for p in find_in_dirs(["."], "*.md",
                       extra_filter=lambda p: "troubleshooting" in p.parts):
     bn = p.name
+    if bn == "README.md" or bn.endswith("_INDEX.md"):
+        continue
     if not date_re.match(bn):
         print(f"  ❌ 排查记录应为 YYYY-MM-DD-*.md: {p}")
         f_count += 1
 
-# reviews 下的 review 台账
+# reviews 下的 review 台账（具名 *_INDEX.md / README 合法，跳过）
 for p in find_in_dirs(["."], "*.md",
                       extra_filter=lambda p: "reviews" in p.parts):
     bn = p.name
-    if bn == "README.md":
+    if bn == "README.md" or bn.endswith("_INDEX.md"):
         continue
     if not review_re.match(bn):
         print(f"  ❌ review 台账应为 *-review.md: {p}")

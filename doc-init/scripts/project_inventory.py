@@ -18,6 +18,8 @@ from typing import Any
 
 IGNORE_DIRS = {
     ".git",
+    ".build",
+    ".doc-init-dd",
     ".idea",
     ".vscode",
     ".claude",
