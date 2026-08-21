@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # 文档治理只读审计 —— 对应 SKILL.md Step 2。
 # 只读、不改任何文件；自动排除第三方 / 构建产物 / 备份 / git 目录。
-# 用法: audit.py [项目根] [--compact-date YYYY-MM-DD]   默认当前目录；一次只审计一个项目。
+# 用法: audit.py [项目根] [--compact-date YYYY-MM-DD] [--save-metrics 路径] [--compare-metrics 路径]
+#   默认当前目录；一次只审计一个项目。
 #   --compact-date：仅 Step 6 收尾核对压缩账目时传，启用检查 I（逐篇压缩标识硬闸门）；
 #                   Step 2 只读审计阶段不传，跳过该检查。
+#   --save-metrics：把检查 J 的 AGENTS.md 量化指标写入 JSON 基线（Step 2 用）。
+#   --compare-metrics：读基线 JSON，输出压缩前后对比（Step 6 用）；估算 token 上升则标 ⚠。
 #
 # 退出码不表达成败，结论看输出末尾「小结」三个计数与各节 ❌ 行。
 
@@ -19,6 +22,8 @@ from pathlib import Path
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("proj", nargs="?", default=".")
 parser.add_argument("--compact-date", default="")
+parser.add_argument("--save-metrics", default="")
+parser.add_argument("--compare-metrics", default="")
 args = parser.parse_args()
 
 PROJ = Path(args.proj).resolve()
@@ -335,6 +340,96 @@ else:
     from datetime import date
     today = date.today().strftime("%Y-%m-%d")
     print(f"  ⏭ 未指定 --compact-date，跳过（Step 2 只读阶段无需；Step 6 收尾用: audit.py <项目根> --compact-date {today}）")
+
+# ---------- J. AGENTS.md 膨胀度量化与托管块（指标口径借鉴 prompt-audit 的 lint） ----------
+
+print()
+print("## J. AGENTS.md 膨胀度量化与托管块（口径: 字符×0.47 估 token，阈值均为经验值）")
+
+EMPHASIS_WORDS = ("必须", "一律", "禁止", "务必", "不得")
+TOKEN_COEF = 0.47  # 字符→token 实测系数，与 SKILL.md「系数来源」一致
+MARKER_RE = re.compile(r"<!--\s*([\w.-]+)\s*:\s*(begin|start|end)(?:\s+[\w.\-/]+)?\s*-->")
+
+def agents_md_metrics(path):
+    """单份 AGENTS.md 的量化指标：字符/估算 token/规则条数/强调词密度 + 托管块清单。"""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    chars = len(text)
+    rules = sum(
+        1 for line in text.splitlines()
+        if re.match(r"^[-*]\s+\S", line.strip()) or re.match(r"^\d+[.、]\s+\S", line.strip())
+    )
+    emphasis = sum(text.count(w) for w in EMPHASIS_WORDS)
+    density = round(emphasis * 1000 / chars, 1) if chars else 0.0
+    # 托管标记块：成对的 <!-- name:begin/end -->；Step 4 索引重建时须原样保留
+    markers = [MARKER_RE.search(line) for line in text.splitlines()]
+    opens, closes, managed = [], set(), []
+    for m in markers:
+        if not m:
+            continue
+        if m.group(2) in ("begin", "start"):
+            opens.append(m.group(1))
+        else:
+            closes.add(m.group(1))
+    managed = sorted(set(opens) & closes)
+    unmatched = sorted((set(opens) | closes) - (set(opens) & closes))
+    return {
+        "chars": chars, "tokens": int(chars * TOKEN_COEF),
+        "rules": rules, "emphasis": emphasis, "density": density,
+        "managed_blocks": managed, "unmatched_markers": unmatched,
+    }
+
+current_metrics = {}
+for f in find_md("AGENTS.md"):
+    try:
+        current_metrics[str(f)] = agents_md_metrics(f)
+    except OSError:
+        continue
+
+if not current_metrics:
+    print("  ⏭ 未找到 AGENTS.md，跳过")
+else:
+    for rel, m in current_metrics.items():
+        dens_flag = "  ⚠ 超阈值" if m["density"] > 10 else ""
+        print(f"  {rel}: {m['chars']} 字符 ≈ {m['tokens']} token，规则 {m['rules']} 条，"
+              f"强调词 {m['emphasis']} 次（{m['density']}/千字，阈值 10）{dens_flag}")
+        if m["managed_blocks"]:
+            print(f"    🔒 托管块（Step 4 索引重建时原样保留，不压不删）: {', '.join(m['managed_blocks'])}")
+        if m["unmatched_markers"]:
+            print(f"    ❌ 未配对的托管标记（人工检查是否残缺）: {', '.join(m['unmatched_markers'])}")
+
+if args.save_metrics:
+    import json
+    Path(args.save_metrics).write_text(
+        json.dumps(current_metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"  已保存基线 → {args.save_metrics}（Step 6 对比用: audit.py <项目根> --compare-metrics {args.save_metrics}）")
+
+if args.compare_metrics:
+    import json
+    try:
+        baseline = json.loads(Path(args.compare_metrics).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"  ❌ 基线文件不可读（{exc}），跳过对比")
+        baseline = None
+    if baseline is not None:
+        print("  ---- 与基线对比（Step 2 → 当前）----")
+        grew = 0
+        for rel, cur in current_metrics.items():
+            if rel not in baseline:
+                print(f"  {rel}: 新增（≈ {cur['tokens']} token）")
+                continue
+            old = baseline[rel]
+            delta = cur["tokens"] - old["tokens"]
+            arrow = "↑" if delta > 0 else ("↓" if delta < 0 else "=")
+            flag = "  ⚠ 膨胀（应 ≤ 基线，上升需在收工报告说明原因）" if delta > 0 else ""
+            print(f"  {rel}: token {old['tokens']} → {cur['tokens']}（{arrow}{abs(delta)}），"
+                  f"规则 {old['rules']} → {cur['rules']} 条，强调词 {old['density']} → {cur['density']}/千字{flag}")
+            if delta > 0:
+                grew += 1
+        for rel in baseline:
+            if rel not in current_metrics:
+                print(f"  {rel}: 基线里有、现已不存在")
+        if grew == 0 and current_metrics:
+            print("  ✓ 全部 AGENTS.md 估算 token 未超基线")
 
 # ---------- 小结 ----------
 

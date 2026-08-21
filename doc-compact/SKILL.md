@@ -44,6 +44,9 @@ done | sort -u
 - **G** 预置折叠建议（排查 / Review 台账 ≥3 篇，建议性）
 - **H** doc-init 联动：反向全局引用、领域地图段存在性 → **影响 Step 4/5 保护边界**
 - **I** §2.5 路径存活性：对含 `§2.5 物理路径速查` 的 KB，`ls` 验证每行路径是否仍存在；STALE 路径纳入 Step 5 清理（详见 `compression-guide.md` §2.5 路径存活性验证）
+- **J** AGENTS.md 膨胀度量化（字符/估算 token/规则条数/强调词密度）与托管块识别：成对 `<!-- 名字:begin/end -->` 标记的块列为🔒托管块（Step 4 索引重建时原样保留，不压不删）；未配对标记报❌。只认这一种 markdown 标准注释约定，其他样式交给 agent 自行判断
+
+Step 2 顺手加 `--save-metrics <基线路径>` 保存 AGENTS.md 量化基线，Step 6 用 `--compare-metrics` 出压缩前后对比（估算 token 上升会标 ⚠，须在收工报告说明原因）——压缩效果从拍脑袋变成有数据。
 
 人工补充检查：文档放置是否错位、是否冗余膨胀、是否存在易变事实跨文档复述（`grep -rn "具体数字" docs/`，命中 >2 处即疑似）。
 
@@ -126,10 +129,14 @@ find <项目>/docs -name "*.md" -type f -print0 | xargs -0 wc -m | tail -1
 ## Step 6 — 验证
 
 ```bash
-python3 scripts/audit.py <项目根> --compact-date <今日 YYYY-MM-DD>
+# Step 2 存基线：audit.py <项目根> --save-metrics /tmp/dc-metrics.json
+# Step 6 验证：
+python3 scripts/audit.py <项目根> --compact-date <今日 YYYY-MM-DD> --compare-metrics /tmp/dc-metrics.json
 ```
 
 检查 I（压缩标识硬闸门）**必须 `压缩缺标识=0`** 才能收尾。任何缺标识文档 = 本轮漏审，补完重跑。
+检查 J 对比中 AGENTS.md 估算 token 高于基线的，须在收工报告说明原因（如用户本轮明确要求加内容）——不能默默膨胀。
+托管块清单（🔒）须在收工报告里逐个确认仍原样在位。
 H 的 `domain_map_present` / `backlog_present` 不应因本次审计由 True 变 False。
 审计项 I 的 STALE 路径若已在 Step 5 中清理，验证时应为 0；否则说明遗漏。
 
