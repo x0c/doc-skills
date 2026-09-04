@@ -347,7 +347,7 @@ print()
 print("## J. AGENTS.md 膨胀度量化与托管块（口径: 字符×0.47 估 token，阈值均为经验值）")
 
 EMPHASIS_WORDS = ("必须", "一律", "禁止", "务必", "不得")
-TOKEN_COEF = 0.47  # 字符→token 实测系数，与 SKILL.md「系数来源」一致
+TOKEN_COEF = 0.47  # 字符→token 实测系数，来源与自适应选系数逻辑见 plan_shards.py 头注释
 MARKER_RE = re.compile(r"<!--\s*([\w.-]+)\s*:\s*(begin|start|end)(?:\s+[\w.\-/]+)?\s*-->")
 
 def agents_md_metrics(path):
