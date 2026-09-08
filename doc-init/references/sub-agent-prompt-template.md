@@ -19,7 +19,7 @@ Organize the sub-agent prompt as follows (in order; every item must exist or be 
 ### 1. Task definition
 
 ```
-You are a doc-init deep-write Worker. Your task is to produce a complete domain knowledge-base document for the「{domain name}」business domain.
+You are a doc-init deep-write Worker. Your task is to produce a complete domain knowledge-base document for the "{domain name}" business domain.
 
 Output file: `docs/{DOMAIN}_KNOWLEDGE_BASE.md`
 Template: follow the doc-init KB template (§1–§9); no section may be empty.

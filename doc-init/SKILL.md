@@ -1,17 +1,19 @@
 ---
 name: doc-init
-description: Initialize a project documentation system. First check and repair the 「Project Documentation Management」 standard in global AI instruction files, then build an AI-coding-agent-ready domain knowledge network via collaborative Intake, business-domain scanning, hidden-mechanism discovery, optional database evidence mining, and necessary runtime validation. Use when entering a project with no doc structure, or when the global AGENTS.md lacks the doc-governance standard.
+description: Initialize a project documentation system. First check and repair the "Project Documentation Management" standard in global AI instruction files, then build an AI-coding-agent-ready domain knowledge network via collaborative Intake, business-domain scanning, hidden-mechanism discovery, optional database evidence mining, and necessary runtime validation. Use when entering a project with no doc structure, or when the global AGENTS.md lacks the doc-governance standard.
 ---
 
 # Documentation system init (doc-init)
 
-Execution has two phases: **repair global standards first, then initialize project docs**.
+This skill runs in two phases: **repair the global standard first, then initialize the project's docs**.
 
-**Document language:** When writing project docs, follow the project's existing documentation language and the user's language; if unclear, default to English.
+**Document language:** When writing project docs, follow the project's existing documentation language and the user's language; if neither is clear, default to English.
 
-Reminder: the `insert_doc_governance.py` managed block is **document-structure only**; language / memory / review rules live in global AGENTS **non-managed** sections (see `docs/SKILLS_GUIDE.md`). Do not re-introduce those into the injectable STANDARD.
+**Scope reminder:** the block `insert_doc_governance.py` injects covers **documentation structure only**. Language, memory, and review rules belong to the **non-managed** sections of the global AGENTS file (see `docs/SKILLS_GUIDE.md`); never move them back into the injectable STANDARD.
 
 `<DOC_INIT_DIR>` = directory containing this `SKILL.md` (resolve dynamically; do not hard-code absolute paths).
+
+**Literal detection keys:** a few strings written into a project's root `AGENTS.md` are parsed by the scripts in this skill (and protected by `doc-compact`): the section headings `## 领域地图（doc-init）` (domain map), `## 待补充知识库（doc-init backlog）` (pending knowledge bases), `## 文档导航` (documentation navigation), the `覆盖度复核基线` (coverage-review baseline) stamp, and that map table's two column titles. Reproduce them **verbatim**, including full-width parentheses, whatever language the project's docs are written in—translating them silently breaks the coverage gate and the lint checks. Everything else (domain names, anchors, trigger phrases, body text) follows the project's documentation language.
 
 ---
 
@@ -28,7 +30,7 @@ Prefer built-in scripts for mechanical work; keep model context for business jud
 | `scripts/db_miner.py` | Database catalog and domain-level table/field evidence mining |
 | `scripts/git_history_miner.py` | Light Git-history weak-signal mining (hotspots, historical names, Q&A clues) |
 | `scripts/depth_scanner.py` | Deep knowledge extraction: state machines, concurrency, idempotency, events, entity fields, etc. |
-| `scripts/insert_doc_governance.py` | Version detect + auto insert/upgrade of the 「Project Documentation Management」 section in global AI instruction files |
+| `scripts/insert_doc_governance.py` | Version detect + auto insert/upgrade of the "Project Documentation Management" section in global AI instruction files |
 
 Script output is evidence and guardrails—it does not replace model judgment on business boundaries, canonical terms, KB/Guide granularity, or what to persist.
 
@@ -83,7 +85,7 @@ State which files were processed, each script’s output, and which scattered ol
 
 ### Step 6 — Decide: init / continue / review
 
-The sole completion anchor is the root `AGENTS.md` section `## Domain map (doc-init)`:
+The sole completion anchor is the root `AGENTS.md` section `## 领域地图（doc-init）` (domain map; literal detection key):
 
 1. **Map section present** → read it, enter Step 6.5 coverage review; **forbidden** to exit just because “already exists / all Generated / no backlog.”
 2. **Map section absent** → whether or not `docs/` is non-empty, treat as **init incomplete**, enter Step 7/8; when building the map, reuse existing docs—do not rewrite.
@@ -180,9 +182,9 @@ If connection is missing or the user forbids it, mark “Missing real data seman
 
 **Stepwise choices:**
 
-**Step 1: Show the full domain-map panorama + confirm boundary partitioning**
+**Step 1: Show the whole domain map at once, then confirm the boundaries**
 
-First print the full domain map in plain text (one-screen readable), grouped in three segments: `Covered by existing docs (A)` → `Deep-write this session (M, with reasons)` → `Backlog (K, with anchors)`.
+First print the full domain map in plain text, short enough to read on one screen, grouped in three segments: `Covered by existing docs (A)` → `Deep-write this session (M, with reasons)` → `Backlog (K, with anchors)`.
 
 Then ask with a structured choice tool:
 
@@ -258,23 +260,25 @@ python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py \
 
 **Persist the domain map** (**mandatory**, even when this session fully covered everything):
 
-Write the complete domain map into root `AGENTS.md` `## Domain map (doc-init)`. This section **only serves the `doc_coverage.py` coverage gate**—do not duplicate paths and trigger phrases already in doc nav.
+Write the complete domain map into root `AGENTS.md` `## 领域地图（doc-init）`. This section **only serves the `doc_coverage.py` coverage gate**—do not duplicate paths and trigger phrases already in doc nav.
 
-Format: baseline stamp + two-column table (Domain | Entry anchors); **forbidden** process-metadata columns like “Status” or “Notes”—“Generated / Deep-write this session / To be filled” has no value for later work models; doc paths are already registered in doc nav.
+Format: baseline stamp + two-column table (domain | entry anchors); **forbidden** process-metadata columns like “Status” or “Notes”—“Generated / Deep-write this session / To be filled” has no value for later work models; doc paths are already registered in doc nav.
+
+The heading, the baseline-stamp comment, and the two column titles are literal detection keys (see “Literal detection keys” above): copy them exactly as shown. Domain names and anchors are free text in the project’s doc language.
 
 ```markdown
-## Domain map (doc-init)
+## 领域地图（doc-init）
 
-<!-- Coverage-review baseline: 2026-06-21 · source fingerprint scanned 1573 files / Go 412 · TS 88 / 11 submodules · baseline commit a1b2c3d -->
+<!-- 覆盖度复核基线：2026-06-21 · 源码指纹 扫描 1573 文件 / Go 412 · TS 88 / 11 子模块 · 基线提交 a1b2c3d -->
 
-| Domain | Entry anchors |
+| 领域 | 入口锚点 |
 |------|---------|
 | Channel system | src/channels/ |
 | Agent execution loop | src/agents/ |
 | Plugin system | src/plugins/ |
 ```
 
-Fingerprint values come from inventory (`scan.scanned_files`, each `languages[].file_count`, `submodules` count) and `git rev-parse --short HEAD`. Domains registered in the map section must match domains covered by doc nav (the map section does not register backlog—backlog is managed via `upsert_agents_nav.py --backlog`).
+Simplest way to get the stamp right: `doc_coverage.py` prints a ready-to-paste `suggested_stamp` for the current tree—copy that line instead of hand-writing it. Its values come from inventory (`scan.scanned_files`, each `languages[].file_count`, `submodules` count) plus `git rev-parse --short HEAD`. Domains registered in the map section must match domains covered by doc nav (the map section does not register backlog—backlog is managed via `upsert_agents_nav.py --backlog`).
 
 **Conditional ops cheat sheet:** If depth_scanner `runnable_project.type` is not `library/cli/unknown`, generate an “Ops cheat sheet” section in root AGENTS.md (format in `document-templates.md`). Multi-host module projects must list every submodule with `spring-boot-maven-plugin`/`mainClass` and its port.
 
@@ -304,7 +308,7 @@ Include lint errors/warnings in self-assessment. Fix errors before reporting com
 
 - Domain-map total N = Generated (reuse) A + Deep-write this session M + Candidate dead code/drift D + backlog B
 - Assert: A + M + D + B = N ✓ (if not, silent domain drop—must backfill backlog)
-- Assert: root `AGENTS.md` `## Domain map (doc-init)` is written and matches the ledger ✓
+- Assert: root `AGENTS.md` `## 领域地图（doc-init）` is written and matches the ledger ✓
 - Assert: map section has a “coverage-review baseline” stamp ✓
 
 **If Step 6.5 ran**, also output the coverage-review ledger (G gaps + R stale needing refresh; only G + R == 0 may be judged truly complete).

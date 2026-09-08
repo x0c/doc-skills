@@ -1,6 +1,6 @@
 # Multi Source Evidence
 
-This document defines `doc-init` multi-source evidence enrichment rules. The goal is not to expand the default scan scope, but to reinforce real behavior, domain language, and hidden constraints that static code scans miss—using low-cost evidence candidates into domain KBs and shared Guides.
+This document defines `doc-init` multi-source evidence enrichment rules. The goal is not to widen the default scan scope, but to use low-cost evidence candidates to reinforce the real behavior, domain language, and hidden constraints that a static code scan cannot pin down, and to carry them into domain KBs and shared Guides.
 
 ## Core principles
 

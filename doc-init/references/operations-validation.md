@@ -44,8 +44,6 @@ Runtime validation record format:
 - Historical incidents or one-off troubleshooting are not fabricated by doc-init; later `doc-update` or troubleshooting docs persist them.
 
 Detailed runtime business-evidence routing: `multi-source-evidence.md` “Runtime evidence routing”. Operations keeps only start / environment / health content.
-| Illegal-parameter error codes, validation rules, exception wrapping | Domain KB edge cases and validation paths |
-| Core call chains inferred from tracing / logs | Domain KB or cross-domain chain Guide |
 
 ## Conditional OPERATIONS_GUIDE generation
 

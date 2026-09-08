@@ -193,7 +193,7 @@ Root `AGENTS.md` includes:
 - Project intro: 2–3 sentences—what it is, whom it serves, core tech traits.
 - Coding conventions: framework choices, must/forbidden coding patterns.
 - Validation: how to start, how to validate typical changes.
-- Doc navigation: route to domain KBs and Guides by task trigger.
+- Doc navigation: route to domain KBs and Guides by task trigger. The heading is the literal key `## 文档导航` (documentation navigation)—`upsert_agents_nav.py` creates and fills it, and `doc_nav_lint.py` reports an error when it is missing, so do not hand-translate the heading.
 
 ### Ops cheat sheet (runnable projects only)
 

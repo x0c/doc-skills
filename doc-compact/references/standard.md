@@ -1,6 +1,6 @@
 # doc-compact judgment baseline: document management model (full explanation)
 
-This file expands the compact checklist used by `SKILL.md` for audit/compression when a judgment call is unclear.
+Long-form expansion of doc-compact’s judgment baseline. Read on demand when an audit or compression call in `SKILL.md` is unclear.
 
 **Role:** This is **doc-compact’s own compact audit checklist**—finer-grained than the text actually installed into global instruction files (it includes secondary-index numeric thresholds, volatile-fact handling, and other doc-compact-only operational detail). **It is not the injectable STANDARD** and must not be treated as “content to paste into global files.”
 

@@ -23,7 +23,7 @@ the next doc-init run will detect and upgrade already-deployed older versions.
 import sys
 import re
 
-CURRENT_VERSION = 15
+CURRENT_VERSION = 16
 
 # Heading used in the injectable STANDARD (English for open-source inject).
 SECTION_TITLE = "Project Documentation Management"
@@ -38,22 +38,22 @@ STANDARD = f"""## {SECTION_TITLE}
 * Root `AGENTS.md` is the project's only top-level documentation entry; long-lived docs must be reachable in one or two hops from root `AGENTS.md`.
 * Project-root `CLAUDE.md` must default to a single line: `@AGENTS.md`
 * When creating or first taking over a project, check whether the global AI instruction file declares where cross-project tech standard docs live; if declared, look up matching docs by the project's primary language/stack and add a reference at the top of project-root `AGENTS.md` (if undeclared, skip—do not invent paths).
-* **This managed block owns only documentation structure and governance** (entry points, navigation, indexes, single source of truth, what belongs in docs, end-of-task doc checks). **It does not own:** comment/log language, disabling memory, reading standards before review, how to speak to the user, search-before-acting, or other Agent behavior—those live only in global-instruction **non-managed** sections; do not re-introduce them into this block or doc-* skills as a global source of truth. Boundary details: global `docs/SKILLS_GUIDE.md`.
+* **This managed block owns only documentation structure and governance** (entry points, navigation, indexes, single source of truth, what belongs in docs, end-of-task doc checks). **It does not own:** comment/log language, disabling memory, reading standards before review, how to speak to the user, search-before-acting, or any other Agent behavior—those live only in the **non-managed** sections of the global instructions; do not re-introduce them into this block, or into doc-* skills, as a global source of truth. Boundary details: global `docs/SKILLS_GUIDE.md`.
 
 ### 2. Documentation navigation
 
-Project-root `AGENTS.md` must contain a 「Documentation navigation」 section that registers every long-lived doc in the project.
+Project-root `AGENTS.md` must contain a documentation-navigation section that registers every long-lived doc in the project.
 
 Navigation rules:
 
 * One navigation line per doc, with path and purpose.
-* Purpose must be written as 「when to read」, covering all task types for that domain (change / create / review / troubleshoot)—not merely 「what it is」.
-* Trigger conditions by 「task type / business domain」 (e.g. 「when changing/reviewing module X」), not by 「whether code already uses a concrete technology」 (e.g. 「when involving Liquid Glass」)—the latter fails for review tasks: the code under review may not use that technology yet, so the model skips as 「condition unmet」 and misses exactly the 「should use but does not」 finding.
-* **Navigation importance strength must match the doc's real value:** truly must-read docs (costly, hard constraints, recorded pitfalls) must be written as 「**must read** + consequence preview」 in nav / nearby pointers—not weak hints (「read before involving X」「read first」「when reading」). Agents scanning normative docs sort by format weight; weak sentences are skipped. Index reachability ≠ will be read. (2026-08 Harbor client coordinate offset: GCJ-02 docs existed, but only 「read before involving location/maps」—Agent skipped and re-hit the pitfall.)
-* **When the same doc is referenced in multiple places, strength must not be mutually downgraded:** if root `AGENTS.md` says 「must read」, a subproject or nearby pointer must not weaken it to 「read before / read first」—when strengths conflict, Agents follow the weaker one (2026-08 full-repo audit: LingoWeave product KB 「must read」 at root vs 「read before」 on the client side; SharedPlatform same doc with inconsistent strength).
-* **Forbidden: wrapping a doc list in a batch weak lead-in:** e.g. 「Read the following docs first when involving the matching domain」 then a list of KBs—the lead-in itself is the weakest hint and the whole list gets skipped. Every must-read doc must independently say 「**must read** + consequence」; do not uniformly weaken via a lead-in sentence (2026-08 audit: JotBox/Curio backend KB lists; Outbox idempotency and state-machine hard constraints all weakened).
-* **Strength rules are not limited to project-root `AGENTS.md` nav:** cross-product standards (`_standards/*.md`), `workspace-docs/*/README.md` secondary indexes, and global-instruction-file navigation follow the same strength rules—these files are the real entry for Agents across projects; index entries must also carry 「when to read + must read + consequence」 (2026-08 audit: swift/go/frontend standards still used weak 「see」「pitfalls in」 wording; java.md and 12 java-docs runbooks had no index entry despite hard constraints).
-* **Register new docs immediately, then reverse-check; no todo placeholders:** after writing a `docs/` doc, sync it into nav; after registering, reverse-scan `docs/` for misses; do not leave 「should add? / register after implement」 placeholders (2026-08 audit: AlphaForge strategy/backtest architecture docs existed unregistered with only 「should add?」 in AGENTS.md; Infrastructure observability README had hard pitfalls with zero registration).
+* Write the purpose as "when to read", covering every task type for that domain (change / create / review / troubleshoot)—not merely "what it is".
+* Gate triggers on task type and business domain (e.g. "before changing or reviewing module X"), never on whether the code already uses a given technology (e.g. "when Liquid Glass is involved"). The latter breaks review tasks: the code under review may not use that technology yet, so the model treats the condition as unmet, skips the doc, and misses exactly the "should have used it but did not" finding.
+* **Importance strength must match the doc's real value:** a genuinely must-read doc (costly, hard constraints, recorded pitfalls) must be registered as "**must read** + what breaks if you skip it", in nav and in nearby pointers—not as a weak hint such as "read before involving X", "read first", or "worth a look". Agents triaging normative docs rank by that wording, and weak sentences get dropped. Being reachable from an index does not mean it will be read. (2026-08, Harbor client coordinate offset: the GCJ-02 doc existed, but was registered only as "read before involving location/maps"; the Agent skipped it and hit the same pitfall again.)
+* **When the same doc is referenced from several places, the strengths must not contradict each other:** if root `AGENTS.md` says "must read", a subproject entry or nearby pointer must not soften it to "read before" or "read first"—when strengths conflict, Agents follow the weakest one (2026-08 full-repo audit: the LingoWeave product knowledge base was "must read" at root but only "read before" on the client side; the same SharedPlatform doc carried inconsistent strengths).
+* **Forbidden: wrapping a doc list in one weak lead-in**, e.g. "read the following docs first when the matching domain is involved" followed by a list of knowledge bases. The lead-in is the weakest possible hint, and the entire list gets skipped with it. Every must-read doc must carry its own "**must read** + consequence"; do not weaken a whole group through a shared lead-in sentence (2026-08 audit: the JotBox and Curio backend knowledge-base lists weakened Outbox idempotency and state-machine hard constraints this way).
+* **These strength rules are not limited to project-root `AGENTS.md` nav:** cross-product standards (`_standards/*.md`), `workspace-docs/*/README.md` secondary indexes, and global-instruction-file navigation follow them too—across projects, those files are the entry Agents actually land on, so their index entries also need "when to read + must read + consequence" (2026-08 audit: the swift, go, and frontend standards still used weak wording like "see" and "pitfalls in"; `java.md` and 12 java-docs runbooks had no index entry at all despite carrying hard constraints).
+* **Register new docs immediately, then reverse-check; no todo placeholders:** after writing a doc under `docs/`, sync it into nav; after registering, scan `docs/` in reverse for anything missed; never leave placeholders like "should we add this?" or "register once implemented" (2026-08 audit: AlphaForge strategy and backtest architecture docs existed unregistered, with only a "should we add this?" note in `AGENTS.md`; the Infrastructure observability README carried hard pitfalls with zero registration).
 * Prefer placing doc pointers next to the rule they support, not only in a bottom navigation table.
 
 Examples:
@@ -80,7 +80,7 @@ Examples:
 
 Do not create secondary indexes by default; prefer root `AGENTS.md` navigating directly to concrete docs.
 
-Only when a class of docs is so large that flattening harms root `AGENTS.md` readability, create a secondary index, e.g.:
+Create a secondary index only when one class of docs has grown large enough that listing it flat hurts root `AGENTS.md` readability, e.g.:
 
 ```text
 - `docs/troubleshooting/TROUBLESHOOTING_INDEX.md`: must read before troubleshooting any fault / error / abnormal behavior—check for prior similar cases first
@@ -100,7 +100,7 @@ After creating a secondary index, root `AGENTS.md` keeps only the index entry; d
 
 * One concept, rule, or mechanism has one authoritative source.
 * Other docs that need it use relative-path links—do not copy-paste.
-* Once an authoritative conclusion or canonical term is confirmed and updated, every doc citing the old conclusion / old name must be corrected in sync; two docs must never contradict each other on the same fact at any moment. If you cannot decide which is right on the spot, return to authoritative sources (product / requirements / code); if still undecided, mark 「pending confirmation」—do not leave contradictions.
+* Once an authoritative conclusion or canonical term is confirmed and updated, every doc citing the old conclusion / old name must be corrected in sync; two docs must never contradict each other on the same fact at any moment. If you cannot decide which is right on the spot, return to authoritative sources (product / requirements / code); if still undecided, mark it "pending confirmation"—do not leave contradictions in place.
 
 ### 6. What to record
 
@@ -120,7 +120,7 @@ Should not record:
 * Information useful only for the current session and not reusable later.
 * Rules already recorded elsewhere.
 
-When to persist user product intent or investigation conclusions, whether to call `doc-update`, and when to promote cross-project findings to global docs—follow global-instruction **non-managed** sections such as 「Conclusions and product-intent persistence」; this block does not re-legislate them.
+When to persist user product intent or investigation conclusions, whether to call `doc-update`, and when to promote cross-project findings to global docs—follow the **non-managed** sections of the global instructions, such as "Conclusions and product-intent persistence"; this block does not re-legislate them.
 
 ### 7. End-of-task documentation check
 
@@ -129,7 +129,7 @@ Before ending a task, check:
 * Promised docs are finished.
 * New docs are registered in root `AGENTS.md`.
 * After delete / migrate / rename, old references are cleaned.
-* List added / modified / deleted docs by path for the user with a one-line note each; if nothing changed, say clearly 「No documentation changes this time」.
+* List added / modified / deleted docs by path for the user, one line of explanation each; if nothing changed, say so explicitly: "No documentation changes this time".
 
 | Information type | Target location |
 |---|---|
@@ -137,7 +137,7 @@ Before ending a task, check:
 | Project-level behavior norms / constraints / mandatory processes | Project-root `AGENTS.md` |
 | Project business rules / architecture / domain knowledge / docs invalidated by code changes | Docs under `docs/` |
 
-Where global docs land and end-of-task discipline such as 「must call doc-update」 → see global non-managed 「Conclusions and product-intent persistence / Pre-finish reflection」; do not repeat here.
+Where global docs land, and end-of-task discipline such as "always call doc-update", stay in the non-managed global sections "Conclusions and product-intent persistence" and "Pre-finish reflection"; do not repeat them here.
 """
 
 VERSION_RE = re.compile(r"<!--\s*doc-governance-version:\s*(\d+)\s*-->")

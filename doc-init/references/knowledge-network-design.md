@@ -83,13 +83,13 @@ The domain map is Step 8’s **primary deliverable**—produce it before any per
 
 **Backlog write rules:**
 
-- Use `upsert_agents_nav.py --backlog` to register each to-be-filled domain into root `AGENTS.md` section `## Pending knowledge bases (doc-init backlog)`.
-- Each item: `- [Pending] <domain> KB/Guide —— entry anchor: <dir>; trigger: <before changing/troubleshooting feature X>`.
+- Use `upsert_agents_nav.py --backlog` to register each to-be-filled domain into root `AGENTS.md` section `## 待补充知识库（doc-init backlog）` (pending knowledge bases; literal detection key created by the script).
+- Each item comes out as `- [待补充] <domain> KB/Guide —— 入口锚点：<dir>；触发场景：<before changing/troubleshooting feature X>`; you supply only the domain name, anchor, and trigger.
 - On the next doc-init run, Step 6 recognizes the backlog section and continues deep-write—does not retreat to doc-compact.
 
 **The domain-map section is the completion anchor, but not sufficient alone:**
 
-- After the main deep-write batch (even with no backlog / full coverage), persist the full domain map into root `AGENTS.md` `## Domain map (doc-init)`, with a leading “coverage-review baseline” stamp of the current source fingerprint—this step is mandatory.
+- After the main deep-write batch (even with no backlog / full coverage), persist the full domain map into root `AGENTS.md` `## 领域地图（doc-init）` (domain map; literal detection key), with a leading `覆盖度复核基线` (coverage-review baseline) stamp of the current source fingerprint—this step is mandatory.
 - Whether “the project is initialized” may be judged **only** by this map section—**never** by “is `docs/` non-empty,” “how many scattered docs exist,” or “nav entry count.”
 - But “map section exists” only proves init once happened—**not** that the map still covers current code. Old maps may be years stale while code doubled and grew new domains. After detecting the map section, must first run `scripts/doc_coverage.py` coverage gate (SKILL.md Step 6.5): mechanically match current code function entries to map anchors + compare source fingerprint baseline; only exit code `COMPLETE` counts as truly done; `STALE` must continue writing or refresh. Completion = map section exists **and** coverage gate passes—both required.
 - Scattered existing docs (old doc-init, hand-written, or other tools) ≠ init complete. Without a domain-map section, however many docs sit under `docs/`, treat as “init incomplete” and continue scan/generate (reuse existing docs; do not rewrite).

@@ -26,7 +26,7 @@ done | sort -u
 ```
 
 对每个存在的全局文件运行：`python3 <DOC_INIT_DIR>/scripts/insert_doc_governance.py <全局文件路径>`。
-`[跳过]` = 已最新；`[新增/升级]` = 已写入，扫一遍其余章节删旧约定。
+脚本现输出 `[skip]` / `[added]` / `[upgrade]`（`[skip]` = 已最新；`[added]`/`[upgrade]` = 已写入，扫一遍其余章节删旧约定）。
 `<DOC_INIT_DIR>` 不存在时：逐条对照 `references/standard.md` 手工比对，报告中注明「未自动校验」。
 
 **禁止**把当前项目的 `AGENTS.md` 传给 `insert_doc_governance.py`——项目 `AGENTS.md` 存放项目规范，不是全局 AI 指令文件，写入会污染项目文档。
@@ -45,12 +45,15 @@ done | sort -u
 - **F** 文件命名合规（排查 `YYYY-MM-DD-*`，review `*-review.md`）
 - **G** 预置折叠建议（排查 / Review 台账 ≥3 篇，建议性；含 `operations/` 事故候选，见 Step 3）
 - **H** doc-init 联动：反向全局引用、领域地图段存在性 → **影响 Step 4/5 保护边界**
-- **I** §2.5 路径存活性：对含 `§2.5 物理路径速查` 的 KB，`ls` 验证每行路径是否仍存在；STALE 路径纳入 Step 5 清理（详见 `compression-guide.md` §2.5 路径存活性验证）
+- **I** 压缩标识硬闸门 — 仅 Step 6；需 `--compact-date`，只读 Step 2 会报 `⏭ skip`
 - **J** AGENTS.md 膨胀度量化（字符/估算 token/规则条数/强调词密度）与托管块识别：成对 `<!-- 名字:begin/end -->` 标记的块列为🔒托管块（Step 4 索引重建时原样保留，不压不删）；未配对标记报❌。只认这一种 markdown 标准注释约定，其他样式交给 agent 自行判断
 
 Step 2 顺手加 `--save-metrics <基线路径>` 保存 AGENTS.md 量化基线，Step 6 用 `--compare-metrics` 出压缩前后对比（估算 token 上升会标 ⚠，须在收工报告说明原因）。
 
-人工补充检查：文档放置是否错位、是否冗余膨胀、是否存在易变事实跨文档复述（`grep -rn "具体数字" docs/`，命中 >2 处即疑似）。
+人工补充检查（`audit.py` 未脚本化）：
+
+- **§2.5 路径存活性：** 对含 `§2.5 物理路径速查` 的 KB，`ls` 验证每行路径是否仍存在；STALE 路径纳入 Step 5 清理（详见 `compression-guide.md` §2.5 路径存活性验证）
+- 文档放置是否错位、是否冗余膨胀、是否存在易变事实跨文档复述（`grep -rn "具体数字" docs/`，命中 >2 处即疑似）
 
 ### 受保护段
 
@@ -139,11 +142,11 @@ python3 scripts/plan_shards.py <项目根> --domain-map <map.json> # 最终装�
 python3 scripts/audit.py <项目根> --compact-date <今日 YYYY-MM-DD> --compare-metrics /tmp/dc-metrics.json
 ```
 
-检查 I（压缩标识硬闸门）**必须 `压缩缺标识=0`** 才能收尾。任何缺标识文档 = 本轮漏审，补完重跑。若上轮全量压缩距今 < 30 天（多数文档被 Step 5 跳过），脚本的「当日标识」口径会误报——真实闸门为：每篇文档要么带本轮当日标识、要么带 30 天内的旧标识（即「今日标识 ∪ 近 30 天标记 = 全集」，主 agent 自行校验），两者皆无才是漏审（2026-08-28 mc-mdcrm 实跑确立）。
+检查 I（压缩标识硬闸门）摘要行**必须 `missing compact stamp=0`** 才能收尾。任何缺标识文档 = 本轮漏审，补完重跑。若上轮全量压缩距今 < 30 天（多数文档被 Step 5 跳过），脚本的「当日标识」口径会误报——真实闸门为：每篇文档要么带本轮当日标识、要么带 30 天内的旧标识（即「今日标识 ∪ 近 30 天标记 = 全集」，主 agent 自行校验），两者皆无才是漏审（2026-08-28 mc-mdcrm 实跑确立）。
 检查 J 对比中 AGENTS.md 估算 token 高于基线的，须在收工报告说明原因（如用户本轮明确要求加内容）——不能默默膨胀。
 托管块清单（🔒）须在收工报告里逐个确认仍原样在位。
 H 的 `domain_map_present` / `backlog_present` 不应因本次审计由 True 变 False。
-审计项 I 的 STALE 路径若已在 Step 5 中清理，验证时应为 0；否则说明遗漏。
+若 Step 2 人工补充的 §2.5 存活性检查发现 STALE 路径且已在 Step 5 清理，复查存活命令应为 0；否则说明遗漏。
 
 **§0 目录索引完整性**：含 KB 模板的文档（`*_KNOWLEDGE_BASE.md`）应有 `§0 目录索引`。缺失的**本轮顺手补齐**（从各级标题机械生成，属低风险直接做），收工报告列出补齐清单，不推迟。
 

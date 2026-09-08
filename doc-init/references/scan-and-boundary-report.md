@@ -32,7 +32,7 @@ While scanning, prioritize: “Which business modules / domains / lines does thi
 
 ## Coverage review (continuation / suspected complete)
 
-When root `AGENTS.md` already contains `## Domain map (doc-init)`, SKILL.md Step 6.5 requires **calibrating the old map against current code before deciding to finish**. A map only reflects the code landscape at generation time; in old projects maps often sit untouched for years while code doubles and grows new domains—yet the old map is treated as “done.” This section closes that blind spot. **Do not exit early because “map exists / all Generated / no backlog.”**
+When root `AGENTS.md` already contains `## 领域地图（doc-init）` (domain map; literal detection key, see SKILL.md), SKILL.md Step 6.5 requires **calibrating the old map against current code before deciding to finish**. A map only reflects the code landscape at generation time; in old projects maps often sit untouched for years while code doubles and grows new domains—yet the old map is treated as “done.” This section closes that blind spot. **Do not exit early because “map exists / all Generated / no backlog.”**
 
 ### Mechanical judgment by script (not model self-claim)
 
@@ -192,7 +192,7 @@ Map rules:
 - Each domain status: `Generated (reuse existing)` / `Deep-write this session` / `To be filled` / `Candidate dead code / implementation drift`—no “ignore” or “skip”. `Candidate dead code / implementation drift` is for candidates with no basis in the product north star (see “Business-domain identification”); do not generate a KB; move to the knowledge-boundary report’s “Pending discoveries” for user classification; after confirmed as a real feature, next run converts to “Deep-write this session / To be filled”.
 - Thin evidence → mark “pending scan” but still list on the map.
 - After map output, tell the user: reused X, deep-write main batch N, candidate dead code/drift D pending confirmation, remaining M domains will register into backlog.
-- **This map must eventually be persisted into root `AGENTS.md` `## Domain map (doc-init)`** (full rewrite at Step 9 wrap-up), with a leading “coverage-review baseline” stamp of the current source fingerprint. That is doc-init’s completion anchor—`docs/` non-emptiness or scattered doc count cannot replace it. On the next doc-init run, if the section is missing, treat as “init incomplete” and re-run the flow; if present, still do not finish immediately—first coverage-review against current code (see “Coverage review” in this file); the baseline stamp exists for that review’s code-volume compare.
+- **This map must eventually be persisted into root `AGENTS.md` `## 领域地图（doc-init）`** (full rewrite at Step 9 wrap-up), with a leading `覆盖度复核基线` (coverage-review baseline) stamp of the current source fingerprint. That is doc-init’s completion anchor—`docs/` non-emptiness or scattered doc count cannot replace it. On the next doc-init run, if the section is missing, treat as “init incomplete” and re-run the flow; if present, still do not finish immediately—first coverage-review against current code (see “Coverage review” in this file); the baseline stamp exists for that review’s code-volume compare.
 
 ## Knowledge-boundary report template
 
@@ -300,13 +300,15 @@ python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py \
   --when-to-read "<before changing/troubleshooting this feature>"
 ```
 
-Generated entry format:
+The script creates the section and the entries itself; its heading and the `[待补充]` (pending) item prefix are literal detection keys, so do not hand-translate or hand-write them:
 
 ```
-## Pending knowledge bases (doc-init backlog)
+## 待补充知识库（doc-init backlog）
 
-- [Pending] Channel system KB —— entry anchor: src/channels/; trigger: before changing/troubleshooting any channel integration.
-- [Pending] Plugin system KB —— entry anchor: src/plugins/; trigger: before developing or troubleshooting plugin registration and lifecycle.
+- [待补充] Channel system KB —— 入口锚点：src/channels/；触发场景：before changing/troubleshooting any channel integration.
+- [待补充] Plugin system KB —— 入口锚点：src/plugins/；触发场景：before developing or troubleshooting plugin registration and lifecycle.
 ```
+
+Only `--name` / `--anchor` / `--when-to-read` are yours to write, in the project’s doc language.
 
 Step 11 self-assessment must report: map total / generated this session / backlog count, and assert the sum is correct (generated + backlog = total).

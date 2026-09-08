@@ -49,9 +49,9 @@ None of the three hit = safe to delete.
 - Numbers / thresholds, identifiers (class / field / API / enum / config key)
 - Boundary conditions, exceptions, invariants, safety constraints, external contracts
 - The one motivation sentence that would flip a decision (delete it and the direction changes)
-- `§2.5` physical path quick-lookup tables — direct entry for agents locating code; do not delete or compress
-- `§1.5` architecture-overview mermaid — key entry for building a whole-system picture; do not delete or compress
-- `§0` TOC tables — in-KB navigation entry; do not delete or compress
+- `§2.5 物理路径速查` physical path quick-lookup tables — direct entry for agents locating code; do not delete or compress
+- `§1.5 架构概览` architecture-overview mermaid — key entry for building a whole-system picture; do not delete or compress
+- `§0 目录索引` TOC tables — in-KB navigation entry; do not delete or compress
 - Method-name anchors (e.g. `ClassName.method() → callee()`) — stable code location; do not delete
 - Paired `<!-- name:begin/end -->` 🔒 managed blocks in AGENTS.md (including `managed:inherited-agents`) — preserve verbatim in Steps 4/5; do not compress or delete
 
@@ -107,7 +107,7 @@ Compression headroom varies hugely by type; one scale for all audits misses a lo
 | Type | Typical headroom | Audit focus |
 |------|------------------|-------------|
 | Troubleshooting `troubleshooting/` | **Large (often 80%+)** | Diary narrative, duplicated verification steps, worthless appendices, “summary” that rehashes root cause, “reviewer / next review” metadata |
-| Ops incident docs `operations/` (`*incident*` / `*outage*` / `YYYY-MM-DD-*`) | **Large** (same scale as troubleshooting) | Same as troubleshooting; counts toward type-driven fold threshold; prefer pointer indexes; do not relocate by default |
+| Ops incident docs `operations/` (filename matching `incident` / `fix`, or `YYYY-MM-DD-*`) | **Large** (same scale as troubleshooting) | Same as troubleshooting; counts toward type-driven fold threshold; prefer pointer indexes; do not relocate by default |
 | Design proposals `design/` | Medium (10–30%) | Long “industry background” / “motivation” padding, full write-ups of abandoned options |
 | Runbooks / playbooks | **Tiny** | Almost incompressible—every curl/SQL is an execution step |
 | Review ledgers | Small | Long descriptions of closed issues may shorten; open issues must not be deleted |
@@ -117,9 +117,9 @@ Saying “nothing compressible” about a knowledge base is a normal conclusion.
 
 ---
 
-## Batch compact-marker script
+## Batch compact-stamp script
 
-Append markers with a script; do not hand-edit file by file:
+Append stamps with a script; do not hand-edit file by file. Keep the Chinese marker text exactly as written—`audit.py` matches the literal `整理/压缩于 <date>`:
 
 ```python
 import re, glob
@@ -171,7 +171,7 @@ Not every doc can be compressed forever. Stop when you see:
 
 - **Already at the minimum agent-usable information:** deleting any more line forces the agent to search code before it can act in some task scenario
 - **Structured content > 80%:** tables, code blocks, and index entries dominate—almost no narrative left to compress
-- **Already marked as compressed:** last compact < 30 days ago and no code change → skip; report “recently compressed”
+- **Already carries a compact stamp:** last compact < 30 days ago and no code change → skip; report “recently compressed”
 - **Runbooks/playbooks:** every line is a step → almost incompressible (see “Compression intensity by document type” above)
 
 ### Drift risk across multiple compressions
@@ -194,6 +194,6 @@ When the main agent merges subagent ledgers, beyond the four drift checks above,
 1. **Same-domain criteria consistency across subagents:** when one domain is split across subagents (e.g. billing domain, 12 docs → 2 subagents), check both treated “the same class of redundancy” the same way—A deleted all “historical narrative,” B kept it as footnotes = criteria divergence. On divergence → main agent unifies the ruling and sends back for alignment.
 2. **Dedup landing for facts repeated across shards:** the same number/boundary/exception may sit in docs assigned to different subagents (e.g. a threshold in a design doc under A and a KB under B). Each subagent only sees its shard and cannot pick the authority. On merge, the main agent must **cross-shard scan the same volatile fact**: grep each subagent’s post-compress output for the same number; confirm only the authority remains and others were distilled to stable conclusions. This is the hard parallel-case check of “volatile facts, single source”—serial agents rely on memory across docs; parallel runs need post-hoc main-agent grep.
 3. **Protected sections not mishandled:** subagents received the protected list, but under context pressure may still delete a `§2.5` row, a `§0` TOC entry, a method-name anchor, or a 🔒 managed block. After merge, run `grep -c` checks: each KB’s `§2.5` / `§0` / `§1.5` anchor line counts should match pre-compress (protected sections may not drop rows—only STALE paths inside may change); AGENTS.md managed-block marker pairs must still exist. Fewer lines = mishandling → roll that section back.
-4. **Compact markers complete:** each subagent should append `<!-- 该文档整理/压缩于 YYYY-MM-DD -->`, but parallel runs often miss. After merge, run Step 6’s `audit.py --compact-date` hard gate—`压缩缺标识=0` / missing-marker = 0 is the last parallel defense; any miss = that subagent forgot markers; close only after fixing. If most docs were skipped as “recently compressed,” the real gate is “today’s markers ∪ last-30-day markers = full set.”
+4. **Compact stamps complete:** each subagent should append `<!-- 该文档整理/压缩于 YYYY-MM-DD -->` (exact Chinese marker—`audit.py` matches this literal), but parallel runs often miss some. After merge, run Step 6’s `audit.py --compact-date` hard gate—a summary line reporting `missing compact stamp=0` is the last parallel defense; any miss = that subagent forgot stamps; close only after fixing. If most docs were skipped as “recently compressed,” the real gate is “today’s stamps ∪ last-30-day stamps = full set.”
 
 **Disposition when post-check finds drift:** single-doc drift → roll that doc back to pre-compress (`git checkout`) and re-compress; cross-shard criteria divergence → main agent issues a unified ruling and sends all divergent parties to re-compress affected passages. **Do not** patch on top of compressed output—patches decouple that doc from the criteria baseline and make the next doc-compact harder to audit.

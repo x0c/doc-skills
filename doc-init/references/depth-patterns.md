@@ -189,7 +189,7 @@ All patterns share these steps; each pattern section only adds that pattern’s 
 - Per field check: ① same name across entities with different meaning? ② NULL has business semantics? ③ implicit framework behavior (optimistic lock / auto-fill / logical delete)? ④ FK naming implies a different target than reality?
 - Especially multi-table same-named fields with different semantics (easy to mix via autocomplete)
 
-**AI pitfall:** Without extracting field semantics, AI will: ① write `WHERE expire_time > NOW()` and miss NULL=forever-valid rows; ② pass same-named fields between Services with wrong meaning (e.g. “customer TID” into an API expecting “流水 TID”); ③ delete or change fields with implicit framework behavior (e.g. remove `@Version` and lose concurrency control).
+**AI pitfall:** Without extracting field semantics, AI will: ① write `WHERE expire_time > NOW()` and miss NULL=forever-valid rows; ② pass same-named fields between Services with wrong meaning (e.g. a “customer TID” into an API expecting a “transaction TID”); ③ delete or change fields with implicit framework behavior (e.g. remove `@Version` and lose concurrency control).
 
 ---
 
@@ -248,7 +248,7 @@ All patterns share these steps; each pattern section only adds that pattern’s 
 | `entity_fields` | Entity field semantic traps (h) | §4 Table/field entries + §6 Hidden constraints |
 | `json_field_patterns` | JSON field format extraction (i) | §6 Hidden constraints (format rules) |
 | `framework_components` | — | §3 Code entries + §5 Flow index (by component type into the matching domain) |
-| `runnable_project_type` | — | Root `AGENTS.md` ops cheat sheet (see next section) |
+| `runnable_project.type` | — | Root `AGENTS.md` ops cheat sheet (see next section) |
 
 **Handling rules:**
 
@@ -260,7 +260,7 @@ All patterns share these steps; each pattern section only adds that pattern’s 
 
 ## Conditional ops cheat-sheet generation
 
-`runnable_project_type` decides whether and how root `AGENTS.md` gets an ops cheat sheet. Generate only when confirmed as a runnable service (not a pure library or CLI tool).
+`runnable_project.type` decides whether and how root `AGENTS.md` gets an ops cheat sheet. Generate only when confirmed as a runnable service (not a pure library or CLI tool).
 
 ### spring-boot
 

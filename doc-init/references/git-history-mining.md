@@ -7,7 +7,7 @@ This document defines how `doc-init` uses Git history. Git history is high-noise
 - Hotspot risk: frequently changed directories and repeatedly fixed/reverted files hint where to gather more evidence when generating KBs.
 - Historical compatibility: commit-message clues about compatibility, migration, deprecation, legacy data, rollback, production, etc., trigger user follow-ups.
 - Domain boundaries: files that often change together can help judge which code may belong to the same business domain.
-- Domain language: commit messages are corpus of names humans used; candidates for canonical terms or historical aliases.
+- Domain language: commit messages are a corpus of the names humans actually used—candidates for canonical terms or historical aliases.
 
 ## Forbidden
 
