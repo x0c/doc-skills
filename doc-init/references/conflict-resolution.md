@@ -1,31 +1,31 @@
 # Conflict Resolution
 
-本文定义 doc-init 在确认产品真相后如何处理已有文档冲突。
+This document defines how doc-init handles conflicts with existing docs after product truth is confirmed.
 
-## 触发时机
+## When it triggers
 
-任何阶段（产品北极星确认、Q&A、用户纠正）确立的真相，若与 `docs/` 已有文档相冲突（包括本次或更早 doc-init 产物、人工写的，无论是否已提交 git），必须在当次会话内把冲突文档改对，不允许 `docs/` 同时留两份矛盾结论。按全局规范「§5 单一来源」执行。
+Whenever truth is established at any stage (product north star, Q&A, user correction) and it conflicts with docs already under `docs/` (including this session’s or earlier doc-init output, or hand-written docs, whether or not committed to git), the conflicting docs must be corrected in the same session. Do not leave two contradictory conclusions in `docs/` at the same time. Follow global rule “§5 Single source of truth”.
 
-## 裁定原则
+## Adjudication principles
 
-默认回权威源（产品文档 / 后端 PRD / 代码）核实原文再定，不因旧文档"自称读过 PRD"就免检——这种自称本身是待验证断言。
+Default: go back to authoritative sources (product docs / backend PRD / code), verify the original wording, then decide. Do not skip checks because an old doc “claims it already read the PRD”—that claim itself is an unverified assertion.
 
-仅当用户看过源头后明确认为源头/代码本身已过时、坚持按最新认知来，经用户确认后以用户为准。
+Only when the user has reviewed the source and explicitly judges the source/code outdated, and insists on the latest understanding, treat the user’s confirmation as authoritative.
 
-## 防拉锯：持久化裁定记录
+## Anti-thrashing: persist adjudication records
 
-用户推翻源头时，在对应 KB 写一条带日期和理由的【裁定】记录（格式见 `references/document-templates.md` §6）：
+When the user overrides a source, write a dated 【Ruling】 entry with rationale into the relevant KB (format in `references/document-templates.md` §6):
 
 ```
-- 【裁定】[YYYY-MM-DD] 经用户确认推翻 [权威源原结论]：[本产品/本域的正确结论]（原因：[源头为何过时/不适用]）。下次 doc-init/doc-update 读到本条不再翻案，除非用户再次改口；建议同步更新源头文档，但本仓不擅自跨仓改。
+- 【Ruling】[YYYY-MM-DD] User confirmed overturning [original authoritative conclusion]: [correct conclusion for this product/domain] (reason: [why the source is outdated/inapplicable]). Future doc-init/doc-update that reads this entry must not reverse it unless the user changes their mind again; recommend syncing the source doc, but this repo must not edit across repos on its own.
 ```
 
-下次 doc-init/doc-update 读到它就不再翻案。同时提醒用户后端源文档也建议同步更新，但 doc-init 不擅自跨仓改。
+Future doc-init/doc-update must not overturn this ruling after reading it. Also remind the user that backend source docs should be updated, but doc-init must not edit across repos on its own.
 
-## 传播：裁定后自动执行，不二次确认
+## Propagation: apply automatically after ruling—no second confirmation
 
-真相一经裁定即自动改齐：
+Once truth is ruled, apply changes automatically:
 
-- **改名（主称谓）**：在所有文档全量替换，保留实现别名（代码类名/表名照旧）
-- **改逻辑**：含删整篇 KB、抹领域地图行、改写交叉引用它的 KB——也自动执行
-- 事后详列改了/删了什么；未提交文档被删后 git 无法恢复，**删除清单必须完整**
+- **Rename (canonical term):** replace across all docs; keep implementation aliases (code class names / table names unchanged)
+- **Change logic:** including deleting entire KBs, removing domain-map rows, and rewriting KBs that cross-reference them—also automatic
+- Afterward, list in detail what was changed/deleted; uncommitted deleted docs cannot be recovered via git, so the **deletion inventory must be complete**

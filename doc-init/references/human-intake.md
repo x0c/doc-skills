@@ -1,64 +1,65 @@
 # Human Intake
 
-本文定义 doc-init 的人机协同访谈方式。进入 Phase 2 后，在扫描代码前读取本文件；除非用户明确禁止提问，否则先做轻量 Intake。
+This document defines doc-init’s human–AI collaborative interview style. After entering Phase 2, read this file before scanning code; unless the user explicitly forbids questions, do a light Intake first.
 
-## 设计目标
+## Design goals
 
-doc-init 的亮点不是纯自动静态总结，而是让用户经验、既有资料、代码证据、运行验证互相促进。代码只能提供可见结构；真实经验通常来自用户和实践。
+doc-init’s strength is not pure automatic static summary, but mutual reinforcement among user experience, existing materials, code evidence, and runtime validation. Code only provides visible structure; real experience usually comes from users and practice.
 
-## 产品北极星先行
+## Product north star first
 
-进入任何代码扫描前，先确立产品北极星——产品做什么、给谁、核心循环是什么。这是后续领域地图的过滤依据：代码扫到的模块若在产品定义中找不到依据，是死代码信号，不能直接坐实成业务领域。
+Before any code scan, establish the product north star—what the product does, for whom, and what the core loop is. This filters the later domain map: modules found in code with no basis in the product definition are dead-code signals and must not be promoted directly into business domains.
 
-确立顺序：①读项目已有根 `AGENTS.md` 并跟随其产品指针（含跨仓 PRD/路线图）；②读用户提供或项目内的 PRD/北极星/路线图/设计稿；③都没有则向用户征询一句话产品定义；④仍拿不到且用户已禁止提问 → 硬卡停下，不进入扫描阶段（这条硬卡是下方"用户禁止提问不阻塞"原则的显式例外，详见 SKILL.md Step 7a）。
+Establishment order: ① read the project’s existing root `AGENTS.md` and follow its product pointers (including cross-repo PRD/roadmap); ② read PRD / north star / roadmap / designs provided by the user or already in the project; ③ if none exist, ask the user for a one-sentence product definition; ④ if still unavailable and the user has forbidden questions → hard stop; do not enter the scan stage (this hard stop is an explicit exception to the “user forbidding questions does not block” principle below; see SKILL.md Step 7a).
 
 ## Preflight Intake
 
-除非用户明确说「不要提问 / 直接生成 / 测试模式 / 干跑 / 只输出报告」，进入项目扫描前先做一次轻量 Intake。一次最多问 5-8 个高杠杆问题，按影响文档质量排序。
+Unless the user explicitly says “don’t ask / just generate / test mode / dry run / report only”, do one light Intake before project scanning. Ask at most 5–8 high-leverage questions per round, ordered by impact on doc quality.
 
-优先询问：
+Prefer asking about:
 
-- 资料入口：需求/接口/PRD/设计稿/测试用例/wiki/迁移文档的路径或链接。
-- 业务入口：团队怎么称呼各业务域/业务线和核心概念；**最近最常改、最容易出错**的是哪些模块（仅用于排序本次深写主批的优先级，不删减领域地图）。
-- 运行入口：启动脚本、最小验证链路、日志/链路追踪/DB/MQ/任务后台入口。
-- 依赖与经验：数据库、分表、测试数据、外部依赖替代方式；新人或 AI 最容易误判的坑。
+- Material entry points: paths or links to requirements / APIs / PRD / designs / test cases / wiki / migration docs.
+- Business entry points: how the team names each business domain / line and core concepts; which modules are **most often changed and most error-prone recently** (only to prioritize this session’s deep-write batch—never to shrink the domain map).
+- Runtime entry points: start scripts, minimal validation paths, logs / tracing / DB / MQ / job-admin entry points.
+- Dependencies and experience: databases, sharding, test data, substitutes for external deps; traps newcomers or AI most often misjudge.
 
-**禁止问的问题**：
-- 不要问会**裁剪领域范围**的问题，例如"你克隆这个仓库的目标是什么""你只想看哪块""你关注的范围是什么"。领域地图永远完整枚举所有领域；用户的回答只影响哪些领域排在本次深写主批的前面，不影响哪些领域出现在地图里。
-- 不要问**自己读代码或对比文档就能得出答案**的问题，例如"这份设计文档是否已过期"——直接 diff 文档描述与当前代码即可，不必让用户代劳。提问预算应优先花在产品本质确认和代码看不到的经验上。
+**Questions you must not ask:**
 
-## 提问规则
+- Do not ask questions that would **trim domain scope**, e.g. “what’s your goal cloning this repo”, “which part do you only want to see”, “what’s your focus”. The domain map always enumerates all domains; user answers only affect which domains go first in this deep-write batch, not which domains appear on the map.
+- Do not ask questions you can answer by **reading code or diffing docs yourself**, e.g. “is this design doc outdated”—diff the doc against current code instead of making the user do it. Spend question budget on product essence and experience code cannot see.
 
-- 不要把 Intake 做成长问卷；先问最能改变扫描方向的问题。
-- 用户答不上来不阻塞，标「待补充 / 低置信度」，继续用代码和运行验证推进。
-- 用户给出资料路径时，先读资料再扫代码印证；不要只靠包名、表名猜领域。
-- 用户口述信息落档时标注「来源：用户补充」。
-- 若用户补充与代码证据冲突，写明冲突并列为待确认。
-- 若用户给出的业务叫法与代码名、表注释或历史文档叫法不同，先把用户叫法作为候选主称谓，把其他叫法作为别名证据；只有确认是不同概念时才拆开写。
-- Intake 后仍输出知识边界报告，并针对扫描空洞继续精准 Q&A。
+## Asking rules
 
-## 扫描后的精准 Q&A
+- Do not turn Intake into a long questionnaire; ask first what most changes scan direction.
+- If the user cannot answer, do not block; mark “to be filled / low confidence” and continue with code and runtime validation.
+- When the user gives material paths, read materials first, then scan code to corroborate; do not guess domains from package/table names alone.
+- When persisting oral user info, mark “Source: user supplement”.
+- If user input conflicts with code evidence, state the conflict and list it as pending confirmation.
+- If the user’s business names differ from code names, table comments, or historical docs, treat the user’s name as the candidate canonical term and others as alias evidence; only split them when confirmed to be different concepts.
+- After Intake, still output the knowledge-boundary report, and continue precise Q&A against scan gaps.
 
-扫描完成后，只问代码看不到但会影响 AI 改代码成败的知识。问题必须有具体锚点，不问泛泛的“有什么要注意”。
+## Precise Q&A after scanning
 
-问题类型：
+After scanning, only ask for knowledge code cannot see but that affects whether AI can change code correctly. Questions must have concrete anchors—no vague “anything to watch out for”.
 
-- 隐性依赖：「做完 [操作 A] 后，有没有必须同步做但代码里没体现的操作？」
-- 概念消歧：「[字段 A] 和 [字段 B] 在什么场景下用哪个？可以互传吗？」
-- 业务叫法统一：「代码里叫 [A]、表注释叫 [B]、你刚才说 [C]，它们是同一个概念吗？最终文档里团队更习惯叫哪个？」
-- Git 历史叫法：「提交历史里多次叫 [A]，当前代码/表/接口里叫 [B]，团队现在统一叫哪个？[A] 是历史别名还是仍在使用？」
-- Git 历史约束：「提交历史里反复提到 [兼容/迁移/废弃/fix]，这个约束当前还有效吗？AI 改这块时必须保留什么？」
-- 约束来源：「我看到 [具体代码]，为什么不用 [直觉做法]？」
-- 深层机制：「我看到 [注解/decorator/配置/中间件/hook/codegen] 会改变运行时行为，它为什么必须存在？如果 AI 只改显式代码不处理它，会出什么错？」
-- 验证路径：「改完 [本域操作] 后，项目老手通常怎么确认真的生效？」
+Question types:
 
-如果用户回答比较简短，继续追问细节直到约束清晰可写入文档。问题数量由发现驱动，不设最少数量。
+- Hidden dependencies: “After doing [operation A], is there something that must also happen but isn’t reflected in code?”
+- Concept disambiguation: “When do you use [field A] vs [field B]? Can they be passed interchangeably?”
+- Business naming alignment: “Code calls it [A], table comments call it [B], you just said [C]—same concept? Which name does the team prefer in final docs?”
+- Git historical naming: “History often calls it [A]; current code/tables/APIs call it [B]. Which does the team use now? Is [A] a historical alias or still live?”
+- Git historical constraints: “History repeatedly mentions [compat/migration/deprecation/fix]. Is that constraint still valid? What must AI preserve when changing this area?”
+- Constraint origin: “I see [concrete code]—why not the intuitive approach [X]?”
+- Deep mechanisms: “I see [annotation/decorator/config/middleware/hook/codegen] changes runtime behavior—why must it exist? What breaks if AI only changes explicit code and ignores it?”
+- Validation path: “After changing [this domain’s operation], how do veterans usually confirm it really took effect?”
 
-## 落档规则
+If answers are short, keep probing until constraints are clear enough to write into docs. Question count is discovery-driven; no minimum quota.
 
-- 用户补充的业务叫法、经验、日志入口、测试环境、验证方式进入知识边界报告的「用户 / 资料补充」部分。
-- 已确认的主称谓用于 KB 正文；别名只在首次出现、入口索引或高风险消歧中轻量保留。
-- 用户补充的领域规则进入对应 KB 的业务规则、隐性约束或验证路径。
-- 用户补充的跨域机制进入 Guide，或作为 Guide 候选。
-- 用户补充但缺证据的内容标「来源：用户补充；待代码/运行验证」。
-- 用户主动补充真实故障时，可以写成「常见易忽略条件」或「待 doc-update 沉淀」；不要在 doc-init 阶段伪造历史排障文档。
+## Persistence rules
+
+- User-supplied business names, experience, log entry points, test environments, and validation methods go into the knowledge-boundary report’s “User / materials” section.
+- Confirmed canonical terms are used in KB body text; aliases stay lightly at first appearance, entry indexes, or high-risk disambiguation.
+- User-supplied domain rules go into the corresponding KB’s business rules, hidden constraints, or validation paths.
+- User-supplied cross-domain mechanisms go into a Guide, or as Guide candidates.
+- User content lacking evidence: mark “Source: user supplement; pending code/runtime validation”.
+- When the user volunteers real incidents, you may write “common easy-to-miss conditions” or “pending doc-update persistence”; do not fabricate historical troubleshooting docs during doc-init.

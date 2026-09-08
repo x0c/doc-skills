@@ -1,15 +1,15 @@
 # Evidence Pack Format
 
-证据包是中间产物，供 `doc-init`、`doc-update` 或日常开发消化。不要让数据库挖掘直接替代领域知识库。
+The evidence pack is an intermediate artifact for `doc-init`, `doc-update`, or day-to-day development. Do not let database mining replace domain knowledge bases.
 
-## JSON 顶层结构
+## JSON top-level structure
 
 ```json
 {
   "metadata": {
     "generated_at": "YYYY-MM-DDTHH:mm:ssZ",
     "database_type": "postgresql/mysql/sqlite/unknown",
-    "connection_source": "配置来源或连接串；默认完整记录，用户要求时才脱敏",
+    "connection_source": "config source or connection string; record in full by default, mask only when the user asks",
     "scan_level": "catalog/domain/table/field",
     "sampling_policy": {
       "sample_rows_per_table": 30,
@@ -27,7 +27,7 @@
 }
 ```
 
-## 字段发现
+## Field findings
 
 ```json
 {
@@ -35,27 +35,27 @@
   "column": "expire_time",
   "evidence": {
     "schema": "timestamp nullable",
-    "sample": "样本中出现 NULL",
+    "sample": "NULL appears in the sample",
     "code_refs": ["ValueBalanceDetailMapper"]
   },
-  "business_interpretation": "NULL 表示永久有效",
-  "ai_risk": "只写 expire_time > now() 会漏掉永久有效明细",
+  "business_interpretation": "NULL means permanently valid",
+  "ai_risk": "Writing only expire_time > now() misses permanently valid detail rows",
   "confidence": "high",
   "doc_target": {
     "path": "docs/PAYMENT_KNOWLEDGE_BASE.md",
-    "section": "核心业务规则与隐性约束"
+    "section": "Core business rules and implicit constraints"
   }
 }
 ```
 
-## 表发现
+## Table findings
 
 ```json
 {
   "table": "customer",
-  "role": "业务主表",
+  "role": "business primary table",
   "domain": "CUSTOMER",
-  "why_critical": ["当前业务域主表", "含状态字段", "被多个服务读写"],
+  "why_critical": ["primary table of the current domain", "has status columns", "read/written by multiple services"],
   "field_analysis_status": {
     "analyzed": ["id", "status", "tenant_id"],
     "not_analyzed": ["remark_ext"]
@@ -64,33 +64,33 @@
 }
 ```
 
-## Guide 候选
+## Guide candidates
 
 ```json
 {
   "topic": "SHARDING",
-  "reason": "多个业务域共享分表键、分表元数据和路由规则",
-  "evidence": ["多张表包含 prog_id", "存在分表元数据表", "代码中有路由组件"],
+  "reason": "Multiple domains share shard keys, shard metadata, and routing rules",
+  "evidence": ["multiple tables contain prog_id", "a shard metadata table exists", "routing components exist in code"],
   "doc_target": "docs/SHARDING_GUIDE.md",
   "confidence": "medium"
 }
 ```
 
-## 可落档 Markdown 片段
+## Filable Markdown snippets
 
-每个发现可附短片段，但不要把长期文档写成原始数据 dump：
+Each finding may attach a short snippet, but do not turn long-lived docs into raw data dumps:
 
 ```md
-`value_balance_detail.expire_time` 在数据中允许 `NULL`，结合扣减 SQL 判断，`NULL` 更像永久有效语义，不应按脏数据过滤。改余额扣减或有效期判断时必须同时包含 `expire_time IS NULL` 分支。置信度：高。
+`value_balance_detail.expire_time` allows `NULL` in the data. Combined with deduction SQL, `NULL` more likely means permanently valid and should not be filtered as dirty data. When changing balance deduction or validity checks, always include an `expire_time IS NULL` branch. Confidence: high.
 ```
 
-## 覆盖度
+## Coverage
 
-证据包末尾必须说明：
+The end of the evidence pack must state:
 
-- 已连接 / 未连接数据库。
-- 已 catalog 的 schema 和表数量。
-- 已 sample-table 的表。
-- 已 analyze-field 的字段。
-- 只做 catalog、尚未细扫的业务域。
-- 低置信推断和需要用户确认的问题。
+- Whether the database was connected / not connected.
+- Schemas and table counts already cataloged.
+- Tables already sample-table’d.
+- Fields already analyze-field’d.
+- Domains that only got catalog and have not been deep-scanned yet.
+- Low-confidence inferences and items needing user confirmation.

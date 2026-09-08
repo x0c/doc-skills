@@ -1,31 +1,31 @@
 # Config Discovery
 
-本文定义数据库连接发现方法。不要把它写成某语言教程；先识别项目生态，再找当前项目真实使用的连接来源。
+This document defines how to discover database connections. Do not turn it into a language tutorial; identify the project ecosystem first, then find the connection sources the project actually uses.
 
-## 扫描原则
+## Scan principles
 
-- 先找运行入口和 profile/env 选择机制，再判断哪个配置实际生效。
-- 同时扫描源码配置、环境变量模板、容器/部署配置、测试配置和 ORM/数据源初始化代码。
-- 配置文件里的 secret 引用不等于明文连接；记录引用链，必要时向用户要只读连接。
-- 多数据源项目要区分业务库、日志库、元数据库、测试库、只读库和迁移库。
-- 默认输出完整候选值，方便直接连接测试；只有用户要求或非测试环境才启用脱敏。
+- Find the runtime entry and profile/env selection mechanism first, then decide which config is actually in effect.
+- Scan source config, environment-variable templates, container/deploy config, test config, and ORM/data-source initialization code together.
+- A secret reference in a config file is not a plaintext connection; record the reference chain, and ask the user for a read-only connection when needed.
+- In multi-data-source projects, distinguish business DBs, log DBs, metadata DBs, test DBs, read-only DBs, and migration DBs.
+- By default, output full candidate values so connection tests can run directly; mask only when the user asks or the environment is not a test environment.
 
-## 常见入口速查
+## Common entry cheat sheet
 
-这些只是提醒，不要把清单当穷举：
+These are reminders only—do not treat the list as exhaustive:
 
-| 生态 | 常见线索 |
+| Ecosystem | Common clues |
 |---|---|
-| Java/Kotlin | `application*.yml/properties`、Spring profile、`DataSource`、JDBC URL、MyBatis/JPA 配置、Docker/K8s secret |
-| .NET | `appsettings*.json`、`ConnectionStrings`、UserSecrets、`DbContext`、Dapper/ADO.NET 初始化、launch profile |
-| JS/TS | `.env*`、Prisma/TypeORM/Sequelize/Knex 配置、Nest/Next runtime config、Docker/compose |
-| Python | Django settings、SQLAlchemy/FastAPI 配置、Alembic、Celery/worker env、`.env*` |
-| Go | viper/envconfig、`config*.yaml/json/toml`、`database/sql` 初始化、gorm/sqlx 配置、Docker/compose |
-| 通用 | `docker-compose*.yml`、Helm/K8s manifests、Terraform、CI variables、README 启动说明、测试容器配置 |
+| Java/Kotlin | `application*.yml/properties`, Spring profile, `DataSource`, JDBC URL, MyBatis/JPA config, Docker/K8s secret |
+| .NET | `appsettings*.json`, `ConnectionStrings`, UserSecrets, `DbContext`, Dapper/ADO.NET init, launch profile |
+| JS/TS | `.env*`, Prisma/TypeORM/Sequelize/Knex config, Nest/Next runtime config, Docker/compose |
+| Python | Django settings, SQLAlchemy/FastAPI config, Alembic, Celery/worker env, `.env*` |
+| Go | viper/envconfig, `config*.yaml/json/toml`, `database/sql` init, gorm/sqlx config, Docker/compose |
+| General | `docker-compose*.yml`, Helm/K8s manifests, Terraform, CI variables, README startup notes, testcontainer config |
 
-## 输出字段
+## Output fields
 
-连接发现只输出候选，不直接断言可用：
+Connection discovery only emits candidates; it does not assert that they work:
 
 ```json
 {
@@ -35,17 +35,17 @@
   "value": "postgresql://user:password@localhost:5432/app",
   "profile_or_env": "Development",
   "confidence": "medium",
-  "notes": ["引用环境变量 DB_PASSWORD，未在仓库内找到明文值时需要用户补充"]
+  "notes": ["References env var DB_PASSWORD; if no plaintext value is found in the repo, ask the user to supply it"]
 }
 ```
 
-## 需要问用户的情况
+## When to ask the user
 
-只在缺少必要信息时问，不要为了“确认一下”打断：
+Ask only when required information is missing; do not interrupt just to “confirm”:
 
-- 只有 secret 名称，没有本地可用值。
-- 发现多个候选连接，无法判断哪个是只读或测试环境。
-- 连接指向生产或疑似生产，且没有只读保证。
-- 项目强依赖数据库事实，但没有任何连接来源。
+- Only a secret name exists, with no locally usable value.
+- Multiple candidate connections exist and it is unclear which is read-only or a test environment.
+- The connection points at production or likely production, with no read-only guarantee.
+- The project strongly depends on database facts, but no connection source exists.
 
-用户禁止提问时，记录「数据库证据缺失」和缺失原因，继续用代码、人机资料和运行验证建立低置信知识。
+When the user forbids questions, record “database evidence missing” and the reason, then continue building low-confidence knowledge from code, human materials, and runtime validation.

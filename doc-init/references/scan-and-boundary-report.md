@@ -1,310 +1,312 @@
 # Scan And Boundary Report
 
-本文定义 Phase 2 的项目扫描和知识边界报告。完成 Human Intake 后读取本文件，再按项目语言选择性读取 `references/hidden-semantics/` 下的语言专项文档。
+This document defines Phase 2 project scanning and the knowledge-boundary report. After Human Intake, read this file, then selectively read language-specific docs under `references/hidden-semantics/` for the project’s languages.
 
-## 目录
+## Contents
 
-- 扫描目标
-- 项目结构扫描
-- 语言栈与隐藏语义
-- 业务域识别
-- 领域语言统一
-- 多源证据补强
-- Git 历史弱信号
-- 每个业务域内收集
-- 通用隐式语义扫描框架
-- 知识边界报告模板
-- 公共 Guide 候选模板
-- Q&A 空洞识别
-- 预算和收敛
+- Scan goals
+- Project structure scan
+- Language stacks and hidden semantics
+- Business-domain identification
+- Domain language unification
+- Multi-source evidence enrichment
+- Git history weak signals
+- What to collect inside each business domain
+- Generic implicit-semantics scan framework
+- Knowledge-boundary report template
+- Shared Guide candidate template
+- Q&A gap identification
+- Budget and convergence
 
-## 扫描目标
+## Scan goals
 
-扫描时优先回答：「这个项目实际按哪些业务模块 / 业务领域 / 业务条线工作？」不要先抽全局技术资源清单。
+While scanning, prioritize: “Which business modules / domains / lines does this project actually work by?” Do not start by extracting a global tech-resource inventory.
 
-## 项目结构扫描
+## Project structure scan
 
-- 优先运行 `scripts/project_inventory.py` 生成机械候选事实：目录结构、语言、框架、构建工具、子模块、现有文档、配置文件和入口候选。
-- 读取 inventory JSON 后再做业务判断；脚本输出的入口候选可能误报或漏报，不得直接等同于业务域边界。
-- 现有 `*.md` 和 `README.md`，避免重建已有文档。
-- 用户在 Intake 中提供的需求文档、接口文档、测试文档、历史 wiki、日志/运行入口。
-- 若 inventory 输出 `evidence_sources`，先把它当作轻量候选证据地图，不要直接深挖全部候选。
+- Prefer `scripts/project_inventory.py` for mechanical candidate facts: directory structure, languages, frameworks, build tools, submodules, existing docs, configs, and entry candidates.
+- Read the inventory JSON before business judgment; script entry candidates may false-positive or miss—never equate them directly to domain boundaries.
+- Existing `*.md` and `README.md`—avoid rebuilding docs that already exist.
+- Requirements, API docs, test docs, historical wiki, log/runtime entry points the user provided in Intake.
+- If inventory outputs `evidence_sources`, treat it first as a light candidate evidence map—do not deep-dig every candidate immediately.
 
-## 覆盖度复核（续接 / 疑似完成时）
+## Coverage review (continuation / suspected complete)
 
-当根 `AGENTS.md` 已含 `## 领域地图（doc-init）` 段，SKILL.md Step 6.5 要求**先用当前代码校准旧地图再决定收工**。地图只反映它生成那一刻的代码版图；老项目里地图常常一两年没动，而代码已翻倍、长出新领域，旧地图却被当成"已完成"——本节给出堵住这个盲区的具体做法。**不要因为"地图存在 / 全是已生成 / 无 backlog"就跳过直接退出。**
+When root `AGENTS.md` already contains `## Domain map (doc-init)`, SKILL.md Step 6.5 requires **calibrating the old map against current code before deciding to finish**. A map only reflects the code landscape at generation time; in old projects maps often sit untouched for years while code doubles and grows new domains—yet the old map is treated as “done.” This section closes that blind spot. **Do not exit early because “map exists / all Generated / no backlog.”**
 
-### 机械部分由脚本判定（不靠模型自陈）
+### Mechanical judgment by script (not model self-claim)
 
-源码指纹基线对比、覆盖率计算、覆盖缺口检测都由 `scripts/doc_coverage.py` 完成，它读 `project_inventory.py` 的 JSON 和地图段，给出 `COMPLETE/STALE/NEEDS_INIT` 退出码：
+Source-fingerprint baseline compare, coverage ratio, and gap detection are done by `scripts/doc_coverage.py`. It reads `project_inventory.py` JSON and the map section, and exits `COMPLETE/STALE/NEEDS_INIT`:
 
-- 把当前 `entry_candidates` + `submodules` 与地图行的入口锚点做前缀匹配，算入口覆盖率，找出**没有任何锚点能落进的成片功能区**（= 地图生成后新增或当年漏掉的领域）。
-- 读地图段的「覆盖度复核基线」戳，对比扫描文件数 / 子模块数的增量；**无基线戳一律判 STALE，按"可能已严重过期"做完整复核**。
+- Prefix-match current `entry_candidates` + `submodules` against map-row entry anchors; compute entry coverage; find **contiguous function areas no anchor lands in** (= domains added after the map or missed at generation).
+- Read the map’s “coverage-review baseline” stamp; compare growth in scanned files / submodule count; **no baseline stamp → always STALE**, treat as “possibly severely stale” and do a full review.
 
-退出码非 `0` 时禁止收工。脚本只输出"哪些功能区没被覆盖"，下面两件事仍由模型做：把未覆盖功能区判成真实领域还是死代码，以及对已覆盖领域做漂移点检。
+Non-`0` exit codes forbid finishing. The script only outputs “which function areas are uncovered”; the model still: (1) judges uncovered areas as real domains vs dead code, and (2) spot-checks drift on already-covered domains.
 
-### 未覆盖功能区 → 产品北极星过滤
+### Uncovered function areas → product north-star filter
 
-对脚本列出的每个未覆盖功能区，按本文件「业务域识别」规则过滤：产品定义中找不到依据、且未接入导航/路由可达的，是死代码/实现漂移，列待确认发现，不直接坐实成领域；确认是真实功能的，作为新领域行加入地图，状态标 `本次深写` 或 `待补充`。
+For each uncovered function area listed by the script, filter with this file’s “Business-domain identification” rules: no basis in the product definition and not reachable via nav/routing → dead code / implementation drift → pending discovery, do not promote to a domain; confirmed real features → add as new map rows with status `Deep-write this session` or `To be filled`.
 
-### 已覆盖领域漂移点检（找文档已过期的领域）
+### Drift spot-check on covered domains (find stale docs)
 
-对每个 `已生成（复用现有）` 领域抽查其 KB：
+For each `Generated (reuse existing)` domain, sample its KB:
 
-- KB「代码入口 / 表入口 / 流程入口」里点名的类、文件、表、流程是否还能在当前代码里落到实处（引用的符号/文件还在不在）。
-- 锚点目录下是否冒出大量该 KB 完全没提及的新入口（新增 Controller/Service/Handler/表/流程节点等）。
+- Do classes/files/tables/flows named in KB “code / table / flow entries” still resolve in current code (symbols/files still present)?
+- Has the anchor directory grown many new entries the KB never mentions (new Controllers/Services/Handlers/tables/flow nodes, etc.)?
 
-判定：
+Judgment:
 
-- 明显对不上（入口大量失效、或冒出成片未覆盖的新入口）→ 把该领域状态从 `已生成（复用现有）` 降级为 `本次深写`（刷新），并在复核报告里写明漂移点。
-- 轻微差异（个别符号改名、少量新增）→ 不强制刷新，记录为待 `doc-update` 增量补充。
+- Clear mismatch (many dead entries, or contiguous new uncovered entries) → demote that domain from `Generated (reuse existing)` to `Deep-write this session` (refresh), and document drift points in the review report.
+- Minor diffs (renamed symbols, a few additions) → do not force refresh; record for incremental `doc-update`.
 
-### 覆盖度复核报告（脚本数字 + 模型判断汇总）
+### Coverage review report (script numbers + model judgment)
 
 ```markdown
-## 覆盖度复核报告
+## Coverage review report
 
-- 源码指纹：上次基线 [日期/指纹] → 当前 [指纹]；变化：扫描文件 +N、子模块 +M、基线提交距 HEAD K 个提交（无旧基线则注明"按可能严重过期做完整复核"）
-- 地图已登记领域 M 个；当前功能区 C 个；已覆盖匹配 X 个
-- 覆盖缺口 G 个：
-  - [领域名] · 锚点 [目录] · 定性 [真实功能→本次深写/待补充 | 候选死代码/实现漂移→待确认]
-- 疑似过期需刷新 R 个：
-  - [领域名] · 漂移点 [失效入口 / 新增成片入口] · 处置 [本次深写刷新 | 转 doc-update]
+- Source fingerprint: prior baseline [date/fingerprint] → current [fingerprint]; delta: scanned files +N, submodules +M, baseline commit K commits behind HEAD (if no prior baseline, note "full review as possibly severely stale")
+- Map registered domains M; current function areas C; covered matches X
+- Coverage gaps G:
+  - [domain] · anchor [dir] · classification [real feature→deep-write this session/to be filled | candidate dead code/drift→pending confirmation]
+- Suspected stale needing refresh R:
+  - [domain] · drift [dead entries / contiguous new entries] · disposition [deep-write refresh this session | defer to doc-update]
 ```
 
-### 复核后分支
+### Branches after review
 
-- **G + R == 0** → 真正完成：把更新后的基线戳按当前指纹写回地图段，告知用户「文档体系仍覆盖当前代码，整理压缩用 doc-compact、增量补充用 doc-update」并退出。
-- **G + R > 0** → 未完成：缺口领域入地图，疑似过期领域降级为本次深写，回 SKILL.md Step 7a → Step 8/9 深写本批；已确认仍准确的 `已生成` 领域不重扫。
+- **G + R == 0** → truly done: write the updated baseline stamp from the current fingerprint back into the map section; tell the user “docs still cover current code; use doc-compact to tidy, doc-update for incremental fills” and exit.
+- **G + R > 0** → not done: add gap domains to the map, demote suspected-stale domains to deep-write this session, return to SKILL.md Step 7a → Step 8/9 for this batch; do not re-scan `Generated` domains confirmed still accurate.
 
-## 语言栈与隐藏语义
+## Language stacks and hidden semantics
 
-先通过构建文件、包管理文件、源码扩展名识别语言栈和主框架，再只读取命中的语言专项扫描文档：
+Identify language stack and main frameworks from build files, package managers, and source extensions, then read only matching language-specific scan docs:
 
-- Java/Kotlin：`references/hidden-semantics/java-kotlin.md`
-- JavaScript/TypeScript：`references/hidden-semantics/javascript-typescript.md`
-- Python：`references/hidden-semantics/python.md`
-- Go：`references/hidden-semantics/go.md`
-- C#/.NET：`references/hidden-semantics/csharp-dotnet.md`
+- Java/Kotlin: `references/hidden-semantics/java-kotlin.md`
+- JavaScript/TypeScript: `references/hidden-semantics/javascript-typescript.md`
+- Python: `references/hidden-semantics/python.md`
+- Go: `references/hidden-semantics/go.md`
+- C#/.NET: `references/hidden-semantics/csharp-dotnet.md`
 
-多语言项目读取多个 reference，但最终产物仍按业务域组织，不按语言分文档。未覆盖语言时，使用通用隐式语义扫描框架，并在自评里标注「语言专项覆盖不足」。
+Multi-language projects read multiple references, but final artifacts are still organized by business domain—not by language. For uncovered languages, use the generic implicit-semantics framework and mark “language-specific coverage insufficient” in self-assessment.
 
-若已运行 `project_inventory.py`，优先使用其 `languages` 和 `recommended_hidden_semantics_refs` 缩小读取范围；若脚本结果与项目实际入口冲突，以源码和构建文件证据为准。
+If `project_inventory.py` already ran, prefer its `languages` and `recommended_hidden_semantics_refs` to narrow reads; if script results conflict with real project entries, trust source and build-file evidence.
 
-## 业务域识别
+## Business-domain identification
 
-业务域识别在产品北极星（`human-intake.md` 已确立的产品定义）框架内进行，不是纯代码归纳：**产品形态——这是不是一个真实功能——以产品文档和用户确认为准；代码只定实现拓扑，即这个功能怎么实现、入口在哪**。从包名、模块名、Controller、Service、Facade、Component、Flow、Job、MQ topic、表名前缀、枚举命名中识别候选业务边界后，逐一对照产品北极星：
-- 产品定义中有依据 → 正常列入领域地图。
-- 产品定义中找不到依据，且该模块未接入导航/路由、调用方追踪不到真实可达路径 → 标记为「候选死代码/实现漂移」列入待确认发现，**不直接新建领域**，交用户确认后再定性。
-- 产品定义中找不到依据，但确实接入导航且用户/代码证据显示在用 → 可能是产品文档滞后或团队内部叫法差异，列为「待确认：产品文档可能过期」，仍可先建领域但标注此冲突。
+Domain identification happens inside the product north star (product definition already established in `human-intake.md`)—not pure code induction: **product shape—whether this is a real feature—is decided by product docs and user confirmation; code only decides implementation topology (how and where).** After finding candidate boundaries from package/module names, Controllers, Services, Facades, Components, Flows, Jobs, MQ topics, table prefixes, and enum names, check each against the north star:
 
-输出候选业务域列表，并说明每个域的证据。
+- Basis in the product definition → list normally on the domain map.
+- No basis in the product definition, and the module is not wired into nav/routing / no real reachable callers → mark “candidate dead code / implementation drift” as a pending discovery; **do not create a domain yet**; let the user classify later.
+- No basis in the product definition, but it is wired into nav and user/code evidence shows it is in use → possibly stale product docs or internal naming differences; mark “pending confirmation: product docs may be outdated”; you may still create a domain but annotate the conflict.
 
-多模块项目先识别构建层级和子模块职责，例如 `api` / `service` / `domain` / `job` / `flow` / `integration` / `common`。同一业务域跨多个子模块时，合并为一份领域知识库，并在文档内标明各子模块入口。
+Output the candidate domain list with evidence per domain.
 
-公共模块（common、framework、starter、plugin、infra 等）默认不生成业务知识库；若承载复杂机制，则生成对应 `*_GUIDE.md`。
+For multi-module projects, first identify build layers and submodule roles, e.g. `api` / `service` / `domain` / `job` / `flow` / `integration` / `common`. When one business domain spans modules, merge into one domain KB and mark each submodule’s entries inside the doc.
 
-## 领域语言统一
+Shared modules (common, framework, starter, plugin, infra, etc.) do not get business KBs by default; if they host complex mechanisms, generate the corresponding `*_GUIDE.md`.
 
-完整规则见 `knowledge-network-design.md`「领域语言统一」节。本节仅补充扫描阶段特有的输出规则：
+## Domain language unification
 
-- 每个候选领域给出「建议主称谓」和证据来源
-- 将代码名、表名、枚举、接口字段等保留为实现别名，不作为正文主称谓来回混写
-- Commit message 中的叫法是历史叫法证据，低于用户确认和核心文档
-- 若存在同名异义、异名同义、参数名跨场景含义不同、注释与真实语义冲突，列为「高风险消歧」并进入 Q&A
-- 若无法判断是不是同一概念，不要强行合并；标「待确认」
+Full rules: `knowledge-network-design.md` “Domain language unification”. This section only adds scan-stage output rules:
 
-## 多源证据补强
+- Each candidate domain gets a “suggested canonical term” and evidence sources
+- Keep code/table/enum/API field names as implementation aliases—do not mix them as body-text canonical terms
+- Commit-message names are historical-name evidence, below user confirmation and core docs
+- Homonyms, synonyms, cross-scenario parameter meaning differences, or comment vs real-semantics conflicts → “high-risk disambiguation” and enter Q&A
+- If you cannot tell whether concepts are the same, do not force-merge; mark “pending confirmation”
 
-读取 `references/multi-source-evidence.md`。多源证据用于补强真实行为和隐性约束，不用于生成全局资源索引。
+## Multi-source evidence enrichment
 
-- Step 8 只做轻量发现：测试、接口契约、前端、配置、CI/CD、日志指标、迁移/seed、外部契约、权限字典、生成元数据和运行时入口只列候选。
-- 生成领域 KB 前再按当前领域深挖相关证据；不要全项目重扫。
-- 运行时证据必须分流：启动/探活/环境阻碍进 Operations，业务行为进 KB，跨领域机制进 Guide。
-- 多源证据可以触发 Q&A：例如前端叫法和数据库注释不一致、测试断言暴露特殊边界、迁移脚本显示兼容字段但当前代码看不出原因。
+Read `references/multi-source-evidence.md`. Multi-source evidence reinforces real behavior and hidden constraints—not for generating global resource indexes.
 
-## Git 历史弱信号
+- Step 8 only light discovery: tests, API contracts, frontend, config, CI/CD, logs/metrics, migrations/seeds, external contracts, permission dicts, generated metadata, and runtime entries—list candidates only.
+- Before generating a domain KB, dig related evidence for the current domain; do not re-scan the whole project.
+- Runtime evidence must be routed: start/health/environment blockers → Operations; business behavior → KB; cross-domain mechanisms → Guide.
+- Multi-source evidence can trigger Q&A: e.g. frontend names vs DB comments disagree, test assertions expose special edges, migration scripts show compat fields whose reason is invisible in current code.
 
-若项目存在可用 Git 历史，读取 `references/git-history-mining.md`，再运行 `scripts/git_history_miner.py` 做轻量扫描。Git 历史只作为高噪声弱信号：
+## Git history weak signals
 
-- 高频变更路径提示热点和风险，不直接等同业务核心。
-- fix / revert / 兼容 / 迁移 / 废弃类提交提示历史约束，必须进入 Q&A 或低置信待确认。
-- 共同变更文件组可辅助业务域判断，但最终收口方式分两层：**实现入口**（代码结构、接口、表、运行时）收口于代码本身；**产品语义**（这是不是真实功能）收口于产品北极星和用户确认，不由代码或 Git 历史单方面决定。
-- Commit message 中的业务叫法可作为领域语言候选，但不得压过用户确认、核心文档和当前接口表达。
+If usable Git history exists, read `references/git-history-mining.md`, then run `scripts/git_history_miner.py` for a light scan. Git history is high-noise weak signal only:
 
-## 每个业务域内收集
+- High-churn paths hint hotspots and risk—not automatically business core.
+- fix / revert / compatibility / migration / deprecation commits hint historical constraints—must enter Q&A or low-confidence pending confirmation.
+- Co-changing file groups can aid domain judgment, but final closure is two-layered: **implementation entries** (code structure, APIs, tables, runtime) close on code itself; **product semantics** (is this a real feature) close on product north star and user confirmation—not decided by code or Git alone.
+- Business names in commit messages may be domain-language candidates but must not outrank user confirmation, core docs, or current API wording.
 
-- 代码入口：Controller / API / Service / Facade / Component / Resolver / Handler / Job / Listener。
-- 表入口：Entity / Mapper / XML SQL / 表名 / 关键字段 / 分表或租户字段。
-- 流程入口：flow_code / trigger_code / node_mapping / 流程组件 / 节点参数。
-- 事件入口：MQ topic / 消费者 / 生产者 / 定时任务 / 异步补偿。
-- 配置入口：配置 key、开关、缓存 key、外部服务配置。
-- 状态和类型：枚举、状态机、类型字段、终态、幂等判断。
-- 本域可见约束：继承关系、注解模式、异常处理、事务边界、锁机制、上下文传递、跨模块调用顺序。
+## What to collect inside each business domain
 
-## 通用隐式语义扫描框架
+- Code entries: Controller / API / Service / Facade / Component / Resolver / Handler / Job / Listener.
+- Table entries: Entity / Mapper / XML SQL / table names / key fields / sharding or tenant fields.
+- Flow entries: flow_code / trigger_code / node_mapping / flow components / node params.
+- Event entries: MQ topic / consumers / producers / scheduled jobs / async compensation.
+- Config entries: config keys, switches, cache keys, external service config.
+- Status and types: enums, state machines, type fields, terminal states, idempotency checks.
+- Domain-visible constraints: inheritance, annotation patterns, exception handling, transaction boundaries, locking, context propagation, cross-module call order.
 
-不要只扫描显式调用链。重点寻找「源码表面行为」和「运行时真实行为」不一致的地方：
+## Generic implicit-semantics scan framework
 
-- 代理 / 包装 / 拦截：代理、中间件、拦截器、hook、decorator、attribute、宏、filter。
-- 声明式元数据：注解、decorator、attribute、schema、YAML/JSON、命名约定、目录约定触发的行为。
-- 生命周期钩子：初始化、启动、关闭、保存前后、提交后、挂载/卸载、observer/listener/signal。
-- 运行时上下文：租户、用户、权限、trace、locale、session、request、transaction 等无显式传参但必须存在的上下文。
-- 外部契约：MQ、缓存、搜索、远程 API、第三方 SDK、数据库触发器、规则引擎、文件系统、异步任务。
-- 生成代码 / 编译期改写：codegen、ORM、protobuf/OpenAPI/GraphQL client、宏、source generator、编译插件。
-- 配置覆盖与环境差异：profile、env、feature flag、灰度开关、租户配置、部署配置。
+Do not scan only explicit call chains. Focus where “surface source behavior” diverges from “real runtime behavior”:
 
-每个发现必须输出：
+- Proxy / wrap / intercept: proxies, middleware, interceptors, hooks, decorators, attributes, macros, filters.
+- Declarative metadata: annotations, decorators, attributes, schemas, YAML/JSON, naming conventions, directory conventions that trigger behavior.
+- Lifecycle hooks: init, start, shutdown, before/after save, after commit, mount/unmount, observer/listener/signal.
+- Runtime context: tenant, user, permission, trace, locale, session, request, transaction—contexts that must exist without explicit parameters.
+- External contracts: MQ, cache, search, remote APIs, third-party SDKs, DB triggers, rule engines, filesystems, async jobs.
+- Generated code / compile-time rewrite: codegen, ORM, protobuf/OpenAPI/GraphQL clients, macros, source generators, compiler plugins.
+- Config overrides and env differences: profiles, env, feature flags, canaries, tenant config, deploy config.
 
-| 隐藏机制 | 触发入口 | 真实生效逻辑 | 证据位置 | 影响业务域 | AI 易错点 | 落档位置 |
+Each finding must output:
+
+| Hidden mechanism | Trigger entry | Real effect logic | Evidence location | Affected domains | AI pitfalls | Persist to |
 |---|---|---|---|---|---|---|
-| [机制名] | [代码/配置/框架入口] | [运行时实际做了什么] | [文件/符号/配置] | [业务域/模块] | [忽略后会写错什么] | [KB 或 GUIDE] |
+| [name] | [code/config/framework entry] | [what runtime actually does] | [file/symbol/config] | [domain/module] | [what goes wrong if ignored] | [KB or GUIDE] |
 
-深层机制若只影响单个业务域，写入该领域知识库的隐性约束；若跨多个业务域复用或修改风险高，生成公共/专项 Guide 候选。
+If a deep mechanism only affects one business domain, write it into that domain KB’s hidden constraints; if reused across domains or high change risk, generate a shared/specialized Guide candidate.
 
-## 领域地图模板
+## Domain map template
 
-**扫描完成后必须先输出完整领域地图，这是 Step 8 的首要交付物，先于任何 per-域详细报告。**
+**After scanning, output the complete domain map first—this is Step 8’s primary deliverable, before any per-domain detailed report.**
 
-地图枚举项目全部业务/功能领域，每行一个，格式如下（可用表格或带状态标注的列表）：
+Enumerate all business/functional domains, one per row (table or status-annotated list):
 
 ```markdown
-## 领域地图（共 N 个领域）
+## Domain map (N domains total)
 
-| 领域名 | 证据锚点（目录 · 入口） | 状态 | 理由/优先级说明 |
+| Domain | Evidence anchors (dir · entry) | Status | Reason / priority |
 |--------|------------------------|------|-----------------|
-| 渠道体系 | src/channels/ · ChannelHandler | 已生成（复用现有） | 已有 CHANNEL_GUIDE.md 覆盖 |
-| Agent 执行循环 | src/agents/ · AgentHarness | 已生成（复用现有） | 已有 AGENT_LOOP_KNOWLEDGE_BASE.md |
-| LLM Provider 体系 | packages/llm-runtime/ · providers/ | 本次深写 | 核心依赖，无现存文档 |
-| 插件体系 | src/plugins/ · PluginRegistry | 待补充 | 架构独立，非本次优先 |
-| 存储 / 状态管理 | src/storage/ · SQLite | 待补充 | 依赖核心域理解后补 |
-| memory-core | extensions/memory-core/ | 待补充 | Git 热点但非本次目标 |
-| CLI 工具 | src/cli/ · commands/ | 待补充 | 工具型，可单独补 |
-| iOS / Android App | ios/ · android/ | 待补充 | 原生层，独立补 |
-| 复习反馈（记住了/不确定/忘了） | Feed/ReviewInbox · ReviewFeedbackView | 候选死代码/实现漂移 | 产品北极星未提及"考试式反馈"，代码已接入导航，待用户确认是否仍是真实功能 |
+| Channel system | src/channels/ · ChannelHandler | Generated (reuse existing) | CHANNEL_GUIDE.md already covers |
+| Agent execution loop | src/agents/ · AgentHarness | Generated (reuse existing) | AGENT_LOOP_KNOWLEDGE_BASE.md exists |
+| LLM Provider system | packages/llm-runtime/ · providers/ | Deep-write this session | Core dependency; no existing docs |
+| Plugin system | src/plugins/ · PluginRegistry | To be filled | Architecturally independent; not this session’s priority |
+| Storage / state | src/storage/ · SQLite | To be filled | Fill after core domains are understood |
+| memory-core | extensions/memory-core/ | To be filled | Git hotspot but not this session’s target |
+| CLI tools | src/cli/ · commands/ | To be filled | Tooling; can fill separately |
+| iOS / Android App | ios/ · android/ | To be filled | Native layer; fill separately |
+| Review feedback (remembered / unsure / forgot) | Feed/ReviewInbox · ReviewFeedbackView | Candidate dead code / implementation drift | Product north star never mentions "exam-style feedback"; code is wired into nav; pending user confirmation whether it is still a real feature |
 ```
 
-地图规则：
-- 锚定 `project_inventory.py` 的 `submodules` + 顶层目录结构 + `entry_candidates`。
-- 建地图前先交叉比对 `docs/` 现有 `*_KNOWLEDGE_BASE.md` / `*_GUIDE.md` 和根 `AGENTS.md` 已有导航；已被现存文档覆盖的领域标「已生成（复用现有）」，不重新生成、不重写。
-- 每个领域标注状态：`已生成（复用现有）` / `本次深写` / `待补充` / `候选死代码/实现漂移`——不存在"忽略"或"不做"。`候选死代码/实现漂移`用于产品北极星中找不到依据的候选模块（见「业务域识别」一节判定规则），不生成对应 KB，转入下方知识边界报告的「待确认发现」交用户定性，确认为真实功能后下次运行再转「本次深写/待补充」。
-- 证据不足时标「待扫描」，仍须列入地图。
-- 地图输出后告知用户：已复用 X 篇、本次深写主批 N 篇、候选死代码/实现漂移 D 个待确认、其余 M 个领域将登记进 backlog。
-- **本地图最终要持久化进根 `AGENTS.md` 的 `## 领域地图（doc-init）` 段**（Step 9 收尾时整段重写），段首带一行「覆盖度复核基线」戳记录当前源码指纹。这是 doc-init 完成判定的锚点——`docs/` 是否非空、已有几篇零散文档都不能替代它。下次运行 doc-init 时，若找不到这个段，必须视为"初始化未完成"重新走流程；找得到也不能直接收工，必须先用当前代码做覆盖度复核（见本文件「覆盖度复核」一节），基线戳就是给那次复核做代码量对比用的。
+Map rules:
 
-## 知识边界报告模板
+- Anchor on `project_inventory.py` `submodules` + top-level directory structure + `entry_candidates`.
+- Before building the map, cross-check existing `docs/` `*_KNOWLEDGE_BASE.md` / `*_GUIDE.md` and root `AGENTS.md` nav; domains already covered mark “Generated (reuse existing)”—do not regenerate/rewrite.
+- Each domain status: `Generated (reuse existing)` / `Deep-write this session` / `To be filled` / `Candidate dead code / implementation drift`—no “ignore” or “skip”. `Candidate dead code / implementation drift` is for candidates with no basis in the product north star (see “Business-domain identification”); do not generate a KB; move to the knowledge-boundary report’s “Pending discoveries” for user classification; after confirmed as a real feature, next run converts to “Deep-write this session / To be filled”.
+- Thin evidence → mark “pending scan” but still list on the map.
+- After map output, tell the user: reused X, deep-write main batch N, candidate dead code/drift D pending confirmation, remaining M domains will register into backlog.
+- **This map must eventually be persisted into root `AGENTS.md` `## Domain map (doc-init)`** (full rewrite at Step 9 wrap-up), with a leading “coverage-review baseline” stamp of the current source fingerprint. That is doc-init’s completion anchor—`docs/` non-emptiness or scattered doc count cannot replace it. On the next doc-init run, if the section is missing, treat as “init incomplete” and re-run the flow; if present, still do not finish immediately—first coverage-review against current code (see “Coverage review” in this file); the baseline stamp exists for that review’s code-volume compare.
 
-扫描完成后，**在领域地图之后**，按「业务域 -> 可生成的 Knowledge Base」输出每个**本次深写**领域的详细知识边界报告，并单独列出公共 Guide 候选。待补充领域不输出详细报告（留给续接时再扫描），只在地图和 backlog 段里登记。
+## Knowledge-boundary report template
+
+After scanning, **after the domain map**, output a detailed knowledge-boundary report per **deep-write this session** domain as “business domain → generatable Knowledge Base,” and separately list shared Guide candidates. To-be-filled domains get no detailed report (scan again on continuation)—only register on the map and backlog section.
 
 ```markdown
-## 知识边界报告
+## Knowledge-boundary report
 
-### [域名]
-**建议生成**：docs/[DOMAIN]_KNOWLEDGE_BASE.md
+### [Domain]
+**Suggested output**: docs/[DOMAIN]_KNOWLEDGE_BASE.md
 
-**所属层级**：
-- 子模块：[module/path 或「单模块项目」]
-- 业务域：[domain]
+**Layering**:
+- Submodules: [module/path or "single-module project"]
+- Business domain: [domain]
 
-**业务范围**：
-- [从代码推断的业务职责、边界、主要操作]
+**Business scope**:
+- [Responsibilities, boundaries, main operations inferred from code]
 
-**领域语言**：
-- 建议主称谓：[最终文档正文应统一使用的业务叫法]
-- 实现别名：[代码类名 / 枚举 / 表名 / 接口字段 / 数据库注释等，只列会帮助定位的别名]
-- 高风险消歧：[同名异义 / 异名同义 / 参数混用 / 注释冲突；没有则写「无」]
+**Domain language**:
+- Suggested canonical term: [business name final body text should use]
+- Implementation aliases: [code classes / enums / tables / API fields / DB comments—only aliases that help locate]
+- High-risk disambiguation: [homonyms / synonyms / parameter mix-ups / comment conflicts; else "none"]
 
-**本域已从代码推断**：
-- 代码入口：[子模块 -> Controller / Service / Component / Job / Listener]
-- 表入口：[表名 -> Entity / Mapper / 关键字段]
-- 流程入口：[flow_code / trigger_code / 组件 ID / 节点映射]
-- 状态与类型：[枚举 / 状态机 / 类型字段]
-- 本域约束（代码可见）：[继承关系、注解约束、事务/锁/上下文等]
-- 深层机制 / 隐式语义：[隐藏机制 -> 触发入口 -> AI 易错点 -> 落档位置]
+**Inferred from code in this domain**:
+- Code entries: [submodule -> Controller / Service / Component / Job / Listener]
+- Table entries: [table -> Entity / Mapper / key fields]
+- Flow entries: [flow_code / trigger_code / component IDs / node mappings]
+- Status and types: [enums / state machines / type fields]
+- Domain constraints (code-visible): [inheritance, annotation constraints, tx/locks/context, etc.]
+- Deep mechanisms / implicit semantics: [hidden mechanism -> trigger entry -> AI pitfalls -> persist location]
 
-**数据库证据（如已启用内置 database-mining 子流程）**：
-- 连接状态：[已连接 / 未连接 / 用户禁止 / 无配置]
-- catalog 覆盖：[schema 数 / 表数量 / 表名前缀或业务域候选]
-- 候选关键表：[表名 -> 候选原因 -> 是否需要在生成本域 KB 前 sample-table/analyze-field]
-- 已深挖表/字段：[仅列当前领域已执行 sample-table/analyze-field 的表或字段]
-- 字段特殊语义：[table.column -> 样本事实/字段点查 -> 业务判断 -> AI 易错点 -> 置信度]
-- 弱关系候选：[from_table.column -> to_table.column -> 证据 -> 置信度]
-- 待确认数据口径：[数据库事实与代码/注释/用户经验冲突或不足的地方]
+**Database evidence (if built-in database-mining subflow enabled)**:
+- Connection: [connected / not connected / user forbade / no config]
+- Catalog coverage: [schema count / table count / table-name prefixes or domain candidates]
+- Candidate key tables: [table -> why candidate -> whether sample-table/analyze-field needed before this domain KB]
+- Already deep-dug tables/fields: [only tables/fields already sample-table/analyze-field'd for this domain]
+- Special field semantics: [table.column -> sample facts/field probe -> business judgment -> AI pitfalls -> confidence]
+- Weak relationship candidates: [from_table.column -> to_table.column -> evidence -> confidence]
+- Pending data semantics: [where DB facts conflict with or lack code/comments/user experience]
 
-**多源证据候选（轻量发现，不默认写入 KB 正文规则）**：
-- 测试 / fixture / mock：[路径 -> 可能补强的规则 / 验证路径 / 待深挖原因]
-- 接口契约：[OpenAPI/GraphQL/Proto/Postman/API client -> 领域入口 / 入参出参 / 领域语言候选]
-- 前端 / 页面 / 菜单：[路径 -> 产品叫法 / 表单字段 / 权限按钮 / 业务入口]
-- 配置 / 环境 / 配置中心：[配置 key 或文件 -> 影响的生效条件 / 开关 / 租户 / 外部依赖]
-- CI/CD / 部署 / 启动脚本：[路径 -> 构建启动线索 / 依赖服务 / Operations 候选]
-- 日志 / 指标 / 告警：[路径或 key -> 验证信号 / 高风险点 / 待确认]
-- 迁移 / DDL / seed：[路径 -> 字段语义 / 初始化数据 / 兼容字段 / 字典菜单候选]
-- MQ / Webhook / 第三方契约：[topic/API/SDK -> 外部约束 / 回调 / 验签 / 重试]
-- 权限 / 菜单 / 字典 / 枚举配置：[来源 -> 状态含义 / 权限边界 / 领域语言候选]
-- 生成代码 / 元数据 / 流程配置：[来源 -> 运行时生效逻辑 / Guide 候选]
-- 需要领域深挖：[当前 KB 生成前必须继续看的证据源；没有则写「无」]
+**Multi-source evidence candidates (light discovery; do not default into KB body rules)**:
+- Tests / fixtures / mocks: [path -> rules/validation paths that may reinforce / why dig]
+- API contracts: [OpenAPI/GraphQL/Proto/Postman/API client -> domain entries / I/O / domain-language candidates]
+- Frontend / pages / menus: [path -> product names / form fields / permission buttons / business entries]
+- Config / env / config center: [config key or file -> effect conditions / switches / tenants / external deps]
+- CI/CD / deploy / start scripts: [path -> build/start clues / dependent services / Operations candidates]
+- Logs / metrics / alerts: [path or key -> validation signals / high-risk points / pending]
+- Migrations / DDL / seeds: [path -> field semantics / init data / compat fields / dict-menu candidates]
+- MQ / Webhooks / third-party contracts: [topic/API/SDK -> external constraints / callbacks / signing / retries]
+- Permission / menu / dict / enum config: [source -> status meaning / permission boundaries / domain-language candidates]
+- Generated code / metadata / flow config: [source -> runtime effect logic / Guide candidates]
+- Needs domain deep-dig: [evidence sources that must be read further before this KB; else "none"]
 
-**用户 / 资料补充**：
-- 已提供资料：[需求文档 / 接口文档 / 测试用例 / wiki / 日志入口]
-- 用户补充经验：[业务叫法 / 常见坑 / 运行验证方式 / 老手判断口径]
-- 与代码证据冲突或待确认：[冲突点]
+**User / materials**:
+- Materials provided: [requirements / API docs / test cases / wiki / log entry points]
+- User experience: [business names / common traps / runtime validation methods / veteran judgment]
+- Conflicts with code or pending confirmation: [conflict points]
 
-**Git 弱信号（如可用）**：
-- 扫描状态：[已扫描 / 不可用 / 浅克隆 / 空历史 / 用户禁止]
-- 热点路径：[路径 -> 高频变更原因候选；只列与本域相关部分]
-- 历史叫法候选：[commit message 中出现的业务叫法 -> 当前实现别名或待确认关系]
-- fix/revert/兼容/迁移线索：[提交主题 -> 可能影响的当前约束 -> 待验证证据]
-- 与当前证据冲突处：[历史叫法或历史约束与当前代码/文档/数据库不一致处]
-- 应向用户确认：[由 Git 弱信号触发的问题]
+**Git weak signals (if available)**:
+- Scan status: [scanned / unavailable / shallow clone / empty history / user forbade]
+- Hot paths: [path -> high-churn reason candidates; only parts related to this domain]
+- Historical name candidates: [business names in commit messages -> current implementation aliases or pending relation]
+- fix/revert/compat/migration clues: [commit subject -> possibly affected current constraints -> evidence to verify]
+- Conflicts with current evidence: [where historical names/constraints disagree with current code/docs/DB]
+- Should confirm with user: [questions triggered by Git weak signals]
 
-**代码看不到，需要 Q&A 补充**：
-- 领域语言确认：[多个来源叫法不一致，需确认最终文档主称谓或是否为同一概念]
-- Git 历史确认：[commit message 中的历史叫法、兼容、迁移、废弃或高频修复线索是否仍影响当前实现]
-- 隐性依赖：[做本域操作前后必须同步做什么，但代码无法证明原因]
-- 概念消歧：[本域内相似 ID / 状态 / 类型 / 表字段的语义差异]
-- 多源证据确认：[前端/接口/测试/DDL/日志等证据与代码或用户说法不一致之处]
-- 约束来源：[代码中出现非直觉做法，但不知道为什么不能用直觉做法]
-- 深层机制原因：[发现隐藏机制，但不知道为什么必须这样使用或错用后果]
-- 验证路径：[改完本域后该 curl 什么、查什么日志/表、看什么流程记录]
+**Invisible in code; needs Q&A**:
+- Domain-language confirmation: [inconsistent names across sources; need final canonical term or same-concept check]
+- Git history confirmation: [whether historical names/compat/migration/deprecation or high-frequency fix clues still affect current implementation]
+- Hidden dependencies: [what must sync before/after this domain’s operations, but code cannot prove why]
+- Concept disambiguation: [semantic differences among similar IDs / statuses / types / table fields in this domain]
+- Multi-source evidence confirmation: [where frontend/API/tests/DDL/logs disagree with code or user]
+- Constraint origin: [non-intuitive code practices without known reasons against the intuitive approach]
+- Deep-mechanism reasons: [hidden mechanisms found without knowing why they must be used that way or wrong-use consequences]
+- Validation paths: [what to curl, which logs/tables/flow records to check after changing this domain]
 
-**已有文档**：[列出现有 *.md 中已覆盖的部分]
+**Existing docs**: [parts already covered in existing *.md]
 
-**inventory 证据**：
-- 使用的 inventory 文件：[.doc-init-project-inventory.json / 未使用]
-- 对本域有帮助的候选：[entry_candidates / submodules / config_candidates 中的关键项]
-- 脚本误报或不足：[误报、漏报、需人工继续判断的地方]
+**Inventory evidence**:
+- Inventory file used: [.doc-init-project-inventory.json / unused]
+- Helpful candidates for this domain: [key items from entry_candidates / submodules / config_candidates]
+- Script false positives or gaps: [false positives, misses, places needing human judgment]
 
-**应关联的 Guide 候选**：[FLOWGRAM_GUIDE.md / SHARDING_GUIDE.md / ...]
+**Related Guide candidates**: [FLOWGRAM_GUIDE.md / SHARDING_GUIDE.md / ...]
 
-### 公共 / 专项 Guide 候选
-- [GUIDE_NAME.md]：哪些业务域会引用；什么任务场景该读；代码证据是什么；为什么应该独立成 Guide 而不是写进某个 KB
+### Shared / specialized Guide candidates
+- [GUIDE_NAME.md]: which domains will reference it; which task scenarios should read it; what code evidence exists; why it should be an independent Guide rather than folded into a KB
 
-### 候选死代码 / 实现漂移（待用户确认）
-- [模块名]：代码证据（目录/类/视图）-> 产品北极星中未找到依据的具体说法 -> 是否接入导航/路由可达 -> 建议定性（疑似死代码 / 疑似产品文档滞后）-> 一句话征询用户的问题
+### Candidate dead code / implementation drift (pending user confirmation)
+- [module]: code evidence (dir/class/view) -> specific north-star wording with no basis found -> whether reachable via nav/routing -> suggested classification (suspected dead code / suspected stale product docs) -> one-sentence question for the user
 ```
 
-报告输出后，告知用户：接下来按业务域提问，只问代码看不到但会影响 AI 改代码成败的知识，**并优先确认候选死代码/实现漂移列表**——这类问题直接决定对应模块进地图还是被排除，应早于一般经验性 Q&A；每个域信息足够后立即生成对应知识库。
+After the report, tell the user: next questions are per business domain, only for knowledge invisible in code but affecting whether AI can change code correctly, **and prioritize confirming the candidate dead-code / drift list**—those questions decide whether modules enter the map or are excluded, ahead of general experiential Q&A; once a domain has enough info, generate its KB immediately.
 
-## 待补充 backlog 登记格式
+## To-be-filled backlog registration format
 
-主批深写完成后，把所有待补充领域写入根 `AGENTS.md` 的独立段，使用以下命令（每个待补充领域调用一次）：
+After the main deep-write batch, write all to-be-filled domains into a dedicated root `AGENTS.md` section with the following command (once per domain):
 
 ```bash
 python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py \
   --root . \
   --backlog \
-  --name "<领域名> KB" \
-  --anchor "<入口目录或文件>" \
-  --when-to-read "<改/排查该功能前>"
+  --name "<domain> KB" \
+  --anchor "<entry dir or file>" \
+  --when-to-read "<before changing/troubleshooting this feature>"
 ```
 
-生成的条目格式：
+Generated entry format:
 
 ```
-## 待补充知识库（doc-init backlog）
+## Pending knowledge bases (doc-init backlog)
 
-- [待补充] 渠道体系 KB —— 入口锚点：src/channels/；触发场景：改/排查任意渠道接入前。
-- [待补充] 插件体系 KB —— 入口锚点：src/plugins/；触发场景：开发或排查插件注册、生命周期前。
+- [Pending] Channel system KB —— entry anchor: src/channels/; trigger: before changing/troubleshooting any channel integration.
+- [Pending] Plugin system KB —— entry anchor: src/plugins/; trigger: before developing or troubleshooting plugin registration and lifecycle.
 ```
 
-Step 11 自评必须报告：地图总数 / 本次已生成数 / backlog 数，并断言三者之和正确（已生成 + backlog = 总数）。
+Step 11 self-assessment must report: map total / generated this session / backlog count, and assert the sum is correct (generated + backlog = total).

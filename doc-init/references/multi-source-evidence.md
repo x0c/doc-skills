@@ -1,87 +1,87 @@
 # Multi Source Evidence
 
-本文定义 `doc-init` 的多源证据补强规则。目标不是扩大默认扫描范围，而是把代码静态扫描看不准的真实行为、领域语言和隐性约束，用低成本证据候选补强到领域 KB 和公共 Guide。
+This document defines `doc-init` multi-source evidence enrichment rules. The goal is not to expand the default scan scope, but to reinforce real behavior, domain language, and hidden constraints that static code scans miss—using low-cost evidence candidates into domain KBs and shared Guides.
 
-## 核心原则
+## Core principles
 
-- 先轻量发现，再按领域深挖；不要一上来全量读测试、接口契约、前端、配置、日志和迁移脚本。
-- 证据源只提供候选事实和补强方向，不单独决定业务结论。
-- 证据落档按语义分流：业务行为进领域 KB，跨领域机制进 Guide，启动/探活/环境阻碍进 Operations。
-- 多源证据参与领域语言统一，但不能覆盖用户确认、核心文档和当前产品/接口表达。
-- 只记录能帮助 AI 改代码、避坑或验证的内容；不要生成全局 `TEST_INDEX.md`、`API_INDEX.md`、`DDL_INDEX.md`。
+- Discover lightly first, then dig deep by domain; do not immediately read all tests, API contracts, frontend, configs, logs, and migration scripts.
+- Evidence sources only provide candidate facts and enrichment directions; they alone do not decide business conclusions.
+- Persist by semantics: business behavior → domain KB; cross-domain mechanisms → Guide; start / health / environment blockers → Operations.
+- Multi-source evidence participates in domain-language unification, but must not override user confirmation, core docs, or current product/API wording.
+- Record only what helps AI change code, avoid traps, or validate; do not generate global `TEST_INDEX.md`, `API_INDEX.md`, or `DDL_INDEX.md`.
 
-## 轻量发现
+## Light discovery
 
-优先使用 `scripts/project_inventory.py` 的 `evidence_sources`。它只列候选路径和命中原因；Agent 读取后再判断哪些证据与候选业务域相关。
+Prefer `scripts/project_inventory.py` `evidence_sources`. It only lists candidate paths and hit reasons; the Agent reads them and then judges which evidence relates to candidate business domains.
 
-轻量发现阶段只回答：
+Light discovery only answers:
 
-- 哪些证据源存在。
-- 它们可能补强哪些业务域或公共机制。
-- 生成哪个领域 KB 前值得进一步读。
-- 哪些候选明显是工具目录、构建产物、历史报告或生成缓存，应忽略。
+- Which evidence sources exist.
+- Which business domains or shared mechanisms they may reinforce.
+- Which domain KB generation is worth reading further before writing.
+- Which candidates are clearly tool dirs, build artifacts, historical reports, or generated caches and should be ignored.
 
-## 证据源与落档
+## Evidence sources and persistence
 
-| 证据源 | 能补强什么 | 什么时候深挖 | 默认落档 |
+| Evidence source | What it can reinforce | When to dig deep | Default persistence |
 |---|---|---|---|
-| 测试 / fixture / mock / 测试 SQL | 业务规则、边界条件、错误码、验证路径、历史兼容场景 | 领域入口已有相关测试，或代码规则看不清原因 | 领域 KB 的业务规则、验证路径、待补充 |
-| 接口契约：OpenAPI / GraphQL / Proto / AsyncAPI / Postman / API client | 产品入口、入参出参、错误码、调用场景、领域标签 | 生成接口密集型领域 KB 前 | 领域 KB 的代码入口、领域语言、验证路径 |
-| 前端路由 / 菜单 / 表单 / 按钮权限 / localStorage | 产品视角业务域、字段叫法、权限边界、页面工作流 | 后端模块名不贴近产品叫法，或需求从页面发起 | 领域 KB 的业务背景、领域语言、权限约束 |
-| 配置 / env / 配置中心引用 / K8s / Compose | profile、开关、租户、灰度、外部依赖、超时与降级 | 代码行为依赖配置，或运行验证需要环境事实 | KB 的隐性约束；跨领域配置机制进 Guide；启动依赖进 Operations |
-| CI/CD / Dockerfile / Helm / Jenkins / Actions / 启动脚本 | 真实构建顺序、启动入口、部署拓扑、必需依赖 | 生成 Operations，或代码入口与部署入口不一致 | Operations；必要的运行时机制进 Guide |
-| 日志 / 指标 / 告警规则 / tracing 配置 | 系统关注的高风险点、验证信号、链路边界 | 需要验证路径或识别高风险机制 | KB 的验证路径；跨领域观测机制进 Guide |
-| DDL / 迁移 / seed / 初始化脚本 / ORM 元数据 | 真实表结构、历史兼容字段、特殊默认值、字典/菜单/权限配置 | 领域依赖数据口径，或字段语义反常 | KB 的表与字段入口、隐性约束；公共数据机制进 Guide |
-| MQ / Webhook / 第三方 SDK / 外部 API 契约 | 外部系统决定的业务边界、验签、重试、回调状态 | 领域包含异步、回调、对外服务或支付/通知等外部链路 | KB 的事件入口；跨领域外部契约进 Guide |
-| 权限 / 菜单 / 字典 / 枚举配置 | 按钮可见性、接口权限、状态含义、领域语言统一 | 需求涉及后台页面、角色权限、字典状态或租户配置 | KB 的权限约束、状态说明、领域语言 |
-| 生成代码 / 低代码配置 / 表单 schema / BPMN / 流程配置 / 规则引擎 | 代码里看不到但运行时生效的流程、节点、字段、规则 | 发现 codegen、流程编排、规则引擎或元数据驱动 | 公共 Guide；单域使用写入 KB 隐性约束 |
+| Tests / fixtures / mocks / test SQL | Business rules, edge cases, error codes, validation paths, historical compat scenarios | Domain already has related tests, or code rules lack reasons | Domain KB business rules, validation paths, to-be-filled |
+| API contracts: OpenAPI / GraphQL / Proto / AsyncAPI / Postman / API client | Product entry points, request/response, error codes, call scenarios, domain labels | Before generating API-heavy domain KBs | Domain KB code entries, domain language, validation paths |
+| Frontend routes / menus / forms / button permissions / localStorage | Product-view domains, field names, permission boundaries, page workflows | Backend module names diverge from product names, or requirements start from pages | Domain KB business background, domain language, permission constraints |
+| Config / env / config-center refs / K8s / Compose | Profiles, flags, tenants, canaries, external deps, timeouts and degradation | Code behavior depends on config, or runtime validation needs environment facts | KB hidden constraints; cross-domain config mechanisms → Guide; start deps → Operations |
+| CI/CD / Dockerfile / Helm / Jenkins / Actions / start scripts | Real build order, start entry points, deploy topology, required deps | Generating Operations, or code entry ≠ deploy entry | Operations; necessary runtime mechanisms → Guide |
+| Logs / metrics / alert rules / tracing config | High-risk points the system cares about, validation signals, chain boundaries | Need validation paths or to identify high-risk mechanisms | KB validation paths; cross-domain observability → Guide |
+| DDL / migrations / seeds / init scripts / ORM metadata | Real schema, historical compat fields, special defaults, dict/menu/permission config | Domain depends on data semantics, or field meaning is unusual | KB table/field entries, hidden constraints; shared data mechanisms → Guide |
+| MQ / Webhooks / third-party SDKs / external API contracts | Business boundaries decided by external systems, signing, retries, callback states | Domain includes async, callbacks, outward services, or payment/notification external chains | KB event entries; cross-domain external contracts → Guide |
+| Permission / menu / dict / enum config | Button visibility, API permissions, status meaning, domain-language alignment | Requirements involve admin pages, role permissions, dict statuses, or tenant config | KB permission constraints, status notes, domain language |
+| Generated code / low-code config / form schema / BPMN / flow config / rule engines | Flows, nodes, fields, rules that take effect at runtime but are invisible in source | Finding codegen, flow orchestration, rule engines, or metadata-driven behavior | Shared Guide; single-domain use → KB hidden constraints |
 
-## 运行时证据分流
+## Runtime evidence routing
 
-运行起来以后，最有价值的不只是“怎么启动”。但 Operations 只保留运行仪表盘，不承载业务规则。
+After the system is running, the most valuable evidence is not only “how to start.” Operations keeps only the runtime dashboard—not business rules.
 
-| 运行时证据 | 应落档 |
+| Runtime evidence | Persist to |
 |---|---|
-| 启动命令、profile/env 生效、端口、健康检查、日志路径、环境阻碍 | `OPERATIONS_GUIDE.md` |
-| 实际路由 / API 清单、Swagger/Actuator/urls/endpoints | 对应领域 KB 的入口索引 |
-| 实际生效配置、feature flag、租户配置、灰度开关 | 领域 KB 隐性约束；跨领域时进 Guide |
-| DI / Bean / Middleware / AOP / Filter 链 | 公共 Guide；单域影响写 KB |
-| 真实 SQL、分库分表路由、字段条件、排序 | 领域 KB 的表字段入口和验证路径 |
-| MQ / Job 注册、consumer group、topic、重试策略 | 领域 KB 事件入口；公共机制进 Guide |
-| Redis key、TTL、缓存穿透条件、一致性边界 | 领域 KB 或缓存 Guide |
-| 权限真实行为、前端隐藏与后端拦截差异 | 领域 KB 权限约束；权限机制进 Guide |
-| 接口调用后的状态流转、表变化、日志、消息、副作用 | 领域 KB 流程/状态机和验证路径 |
-| 非法参数错误码、校验规则、异常包装 | 领域 KB 的边界条件和验证路径 |
-| 链路追踪 / 日志反推的核心调用链 | 领域 KB 或跨领域链路 Guide |
+| Start commands, profile/env effect, ports, health checks, log paths, environment blockers | `OPERATIONS_GUIDE.md` |
+| Actual routes / API lists, Swagger/Actuator/urls/endpoints | Corresponding domain KB entry index |
+| Actually effective config, feature flags, tenant config, canary switches | Domain KB hidden constraints; cross-domain → Guide |
+| DI / Bean / Middleware / AOP / Filter chains | Shared Guide; single-domain impact → KB |
+| Real SQL, sharding routing, field conditions, sorting | Domain KB table/field entries and validation paths |
+| MQ / Job registration, consumer groups, topics, retry policy | Domain KB event entries; shared mechanisms → Guide |
+| Redis keys, TTL, cache-penetration conditions, consistency boundaries | Domain KB or cache Guide |
+| Real permission behavior, frontend hide vs backend intercept differences | Domain KB permission constraints; permission mechanisms → Guide |
+| State transitions, table changes, logs, messages, side effects after API calls | Domain KB flows/state machines and validation paths |
+| Illegal-parameter error codes, validation rules, exception wrapping | Domain KB edge cases and validation paths |
+| Core call chains inferred from tracing / logs | Domain KB or cross-domain chain Guide |
 
-## 领域语言统一
+## Domain language unification
 
-完整规则见 `knowledge-network-design.md`「领域语言统一」节。多源证据都可以提供叫法证据（前端菜单、接口 tag/summary、测试名、DDL 注释、字典值、日志文案、commit message 等），冲突时不要默认生成术语表。
+Full rules: `knowledge-network-design.md` “Domain language unification”. Multi-source evidence can supply naming evidence (frontend menus, API tag/summary, test names, DDL comments, dict values, log copy, commit messages, etc.). On conflict, do not default to generating a glossary.
 
-## 深挖触发
+## When to dig deep
 
-只有满足以下条件之一时，才从候选证据进入深挖：
+Only move from candidate evidence to deep dig when one of these holds:
 
-- 正在生成某个领域 KB，证据路径明显属于该领域。
-- 业务规则、字段语义、状态流转或验证路径仅靠代码无法判断。
-- 证据源显示跨领域共享机制，可能需要 Guide。
-- 用户在 Intake/Q&A 中点名了资料入口、运行入口或老手经验。
-- 自评中该领域存在高风险空洞，需要用证据补强。
+- A domain KB is being generated and the evidence path clearly belongs to that domain.
+- Business rules, field semantics, state transitions, or validation paths cannot be judged from code alone.
+- Evidence shows a shared cross-domain mechanism that may need a Guide.
+- The user pointed to material / runtime / veteran experience in Intake/Q&A.
+- Self-assessment shows high-risk gaps in that domain that need evidence reinforcement.
 
-深挖输出应回答：
+Deep-dig output should answer:
 
-- 证据位置是什么。
-- 补强了哪个业务域或公共机制。
-- 证明了什么，哪些仍低置信。
-- AI 忽略它会写错什么。
-- 应落到 KB、Guide、Operations 还是只进入 Q&A。
+- Where is the evidence.
+- Which business domain or shared mechanism it reinforced.
+- What it proved, and what remains low confidence.
+- What AI would get wrong if it ignored it.
+- Whether it should land in KB, Guide, Operations, or only Q&A.
 
-## 噪音控制
+## Noise control
 
-老项目证据多但噪音也多。默认忽略：
+Old projects have lots of evidence and lots of noise. By default ignore:
 
-- Agent/skill 目录：`.claude/skills/`、`.agents/skills/`。
-- 历史生成报告、批量检查结果、临时导出和大体积机器产物，除非用户明确要求审计它们。
-- Git commit 中的流程词：`feat`、`fix`、`refactor`、`merge`、`into`、`origin`、`dev_*`、`feature_*`，不得当业务名词。
+- Agent/skill dirs: `.claude/skills/`, `.agents/skills/`.
+- Historical generated reports, batch check results, temporary exports, and large machine artifacts unless the user explicitly asks to audit them.
+- Process words in Git commits: `feat`, `fix`, `refactor`, `merge`, `into`, `origin`, `dev_*`, `feature_*`—never treat as business nouns.
 
-若某个被默认忽略的路径在当前项目中确实是业务资料来源，Agent 可以人工读取，但必须在报告中说明为什么覆盖默认过滤。
+If a path ignored by default is truly a business material source in this project, the Agent may read it manually but must explain in the report why the default filter was overridden.

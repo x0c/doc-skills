@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-扫描项目结构，输出 doc-init Phase 2 可复用的机械事实清单。
+Scan project structure and emit mechanical facts for doc-init Phase 2.
 
-该脚本只负责收集候选事实，不判断最终业务域边界，不生成长期文档。
+Collects candidate facts only — does not decide business domains or write long-lived docs.
 """
 
 from __future__ import annotations
@@ -128,17 +128,17 @@ CONFIG_EXTS = {
 EVIDENCE_LIMIT_PER_KIND = 80
 
 EVIDENCE_KIND_LABELS = {
-    "tests": "测试 / fixture / mock",
-    "api_contracts": "接口契约",
-    "frontend": "前端 / 页面 / 菜单",
-    "config_runtime": "配置 / 环境",
-    "ci_cd": "CI/CD / 部署 / 启动脚本",
-    "logs_metrics": "日志 / 指标 / 告警",
-    "ddl_migrations_seed": "DDL / 迁移 / seed",
-    "external_contracts": "MQ / Webhook / 第三方契约",
-    "permissions_dictionary": "权限 / 菜单 / 字典 / 枚举配置",
-    "generated_metadata": "生成代码 / 元数据 / 流程配置",
-    "runtime_validation": "运行时验证入口",
+    "tests": "tests / fixtures / mocks",
+    "api_contracts": "API contracts",
+    "frontend": "frontend / pages / menus",
+    "config_runtime": "config / environment",
+    "ci_cd": "CI/CD / deploy / startup scripts",
+    "logs_metrics": "logs / metrics / alerts",
+    "ddl_migrations_seed": "DDL / migrations / seed",
+    "external_contracts": "MQ / webhook / third-party contracts",
+    "permissions_dictionary": "permissions / menus / dictionaries / enum config",
+    "generated_metadata": "generated code / metadata / flow config",
+    "runtime_validation": "runtime validation entry points",
 }
 
 
@@ -272,7 +272,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "__tests__" in parts
         or re.search(r"(^|[-_.])(test|spec|fixture|fixtures|mock|mocks)([-_.]|$)", lower_name)
     ) and not lower_name.startswith("appsettings."):
-        add_evidence(evidence, "tests", path_rel, "路径或文件名显示为测试、fixture 或 mock")
+        add_evidence(evidence, "tests", path_rel, "path or filename looks like a test, fixture, or mock")
 
     if (
         suffix in {".proto", ".graphql", ".gql"}
@@ -283,7 +283,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or lower_name.endswith("-docs.json")
         or "api-docs" in lower_name
     ):
-        add_evidence(evidence, "api_contracts", path_rel, "文件名或扩展名显示为接口契约")
+        add_evidence(evidence, "api_contracts", path_rel, "filename or extension looks like an API contract")
 
     if (
         suffix in {".vue", ".svelte", ".tsx", ".jsx", ".html"}
@@ -295,7 +295,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "/routes/" in lower_path
         or "/menus/" in lower_path
     ):
-        add_evidence(evidence, "frontend", path_rel, "路径或扩展名显示为前端页面、路由或菜单")
+        add_evidence(evidence, "frontend", path_rel, "path or extension looks like frontend page, route, or menu")
 
     if (
         suffix in CONFIG_EXTS
@@ -304,7 +304,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or lower_name.startswith("appsettings")
         or lower_name.startswith(".env")
     ):
-        add_evidence(evidence, "config_runtime", path_rel, "配置、环境或运行时参数候选")
+        add_evidence(evidence, "config_runtime", path_rel, "config, environment, or runtime parameter candidate")
 
     if (
         ".github/workflows/" in lower_path
@@ -316,7 +316,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "/kubernetes/" in lower_path
         or lower_name in {"makefile", "procfile"}
     ):
-        add_evidence(evidence, "ci_cd", path_rel, "CI/CD、部署或启动脚本候选")
+        add_evidence(evidence, "ci_cd", path_rel, "CI/CD, deploy, or startup script candidate")
 
     if (
         "log4j" in lower_name
@@ -328,7 +328,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "tracing" in lower_path
         or "arthas" in lower_path
     ):
-        add_evidence(evidence, "logs_metrics", path_rel, "日志、指标、告警或 tracing 候选")
+        add_evidence(evidence, "logs_metrics", path_rel, "logs, metrics, alerts, or tracing candidate")
 
     if (
         suffix == ".sql"
@@ -340,7 +340,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "初始化" in path_rel
         or "数据库变更" in path_rel
     ):
-        add_evidence(evidence, "ddl_migrations_seed", path_rel, "DDL、迁移、seed 或初始化数据候选")
+        add_evidence(evidence, "ddl_migrations_seed", path_rel, "DDL, migration, seed, or init-data candidate")
 
     if (
         "mq" in lower_path
@@ -354,7 +354,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "/sdk/" in lower_path
         or suffix in {".proto", ".graphql", ".gql"}
     ):
-        add_evidence(evidence, "external_contracts", path_rel, "消息、回调、SDK 或外部契约候选")
+        add_evidence(evidence, "external_contracts", path_rel, "messaging, callback, SDK, or external-contract candidate")
 
     if (
         "permission" in lower_path
@@ -368,7 +368,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "菜单" in path_rel
         or "权限" in path_rel
     ):
-        add_evidence(evidence, "permissions_dictionary", path_rel, "权限、菜单、字典或枚举候选")
+        add_evidence(evidence, "permissions_dictionary", path_rel, "permission, menu, dictionary, or enum candidate")
 
     if (
         "pdman" in lower_name
@@ -381,7 +381,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "workflow" in lower_path
         or "规则" in path_rel
     ):
-        add_evidence(evidence, "generated_metadata", path_rel, "生成代码、元数据、流程或规则配置候选")
+        add_evidence(evidence, "generated_metadata", path_rel, "generated code, metadata, flow, or rule-config candidate")
 
     if (
         name in BUILD_MARKERS
@@ -393,7 +393,7 @@ def classify_evidence(path: Path, root: Path, evidence: dict[str, list[dict[str,
         or "启动" in path_rel
         or "验证" in path_rel
     ):
-        add_evidence(evidence, "runtime_validation", path_rel, "构建、启动、验证或本地调试入口候选")
+        add_evidence(evidence, "runtime_validation", path_rel, "build, startup, validation, or local-debug entry candidate")
 
 
 def collect_inventory(root: Path, max_files: int) -> dict[str, Any]:
@@ -453,25 +453,25 @@ def collect_inventory(root: Path, max_files: int) -> dict[str, Any]:
         },
         "extension_summary": [{"extension": k, "count": v} for k, v in ext_counter.most_common(30)],
         "recommended_hidden_semantics_refs": hidden_refs,
-        "depth_scanner_hint": "运行 depth_scanner.py --inventory <本文件> 可获取状态机/并发控制/事件/组件等深层知识候选",
+        "depth_scanner_hint": "run depth_scanner.py --inventory <this file> for state-machine/concurrency/event/component deep candidates",
         "notes": [
-            "本报告只提供机械候选事实，业务域边界仍需由 Agent 结合代码、资料、数据库和用户输入判断。",
-            "entry_candidates 按文件名/路径启发式识别，可能包含误报和漏报。",
-            "深度知识提取（状态枚举/并发模式/事件联动/组件索引）由 depth_scanner.py 单独完成。",
+            "This report is mechanical candidate facts only; domain boundaries still need Agent judgment with code, materials, DB, and user input.",
+            "entry_candidates are filename/path heuristics and may include false positives/negatives.",
+            "Deep extraction (status enums / concurrency / events / components) is done separately by depth_scanner.py.",
         ],
     }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="生成 doc-init 项目结构候选事实清单")
-    parser.add_argument("--root", default=".", help="项目根目录")
-    parser.add_argument("--max-files", type=int, default=8000, help="最多扫描文件数")
-    parser.add_argument("--output", help="输出 JSON 文件；缺省打印到 stdout")
+    parser = argparse.ArgumentParser(description="Emit doc-init project-structure candidate facts")
+    parser.add_argument("--root", default=".", help="project root")
+    parser.add_argument("--max-files", type=int, default=8000, help="max files to scan")
+    parser.add_argument("--output", help="output JSON file; default stdout")
     args = parser.parse_args()
 
     root = Path(args.root).expanduser().resolve()
     if not root.exists() or not root.is_dir():
-        print(f"错误：项目根目录不存在或不是目录：{root}")
+        print(f"error: project root does not exist or is not a directory: {root}")
         return 2
 
     data = collect_inventory(root, args.max_files)

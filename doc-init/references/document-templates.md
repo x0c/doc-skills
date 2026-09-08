@@ -1,291 +1,291 @@
 # Document Templates
 
-本文定义 doc-init 生成项目文档时使用的模板和根入口规则。在完成知识边界报告和针对性 Q&A 后读取本文件。
+This document defines templates and root-entry rules used when doc-init generates project docs. Read it after the knowledge-boundary report and targeted Q&A.
 
-## 目录
+## Contents
 
-- 领域知识库模板
-- Guide 模板
-- 根 AGENTS.md
-- 项目根 CLAUDE.md
+- Domain knowledge-base template
+- Guide template
+- Root AGENTS.md
+- Project-root CLAUDE.md
 
-## 领域知识库模板
+## Domain knowledge-base template
 
-该域 Q&A 完成后立即生成并写入文件，不等其他域完成。
+Generate and write the file immediately after that domain’s Q&A—do not wait for other domains.
 
-生成前先完成领域语言归一化：为核心概念选择一个主称谓，正文稳定使用主称谓；代码类名、枚举、表名、字段名和接口参数原样保留在入口索引或首次出现的括号中。不要默认新增「术语表」章节。只有会导致 AI 写错代码的同名异义、异名同义或参数混用，才写入 `§6` 的 `【消歧】`。
+Before generating, finish domain-language normalization: pick one canonical term for core concepts and use it stably in body text; keep code class/enum/table/field/API parameter names verbatim in entry indexes or first-appearance parentheses. Do not default a “Glossary” section. Only homonyms, synonyms, or parameter mix-ups that would make AI write wrong code go into §6 `【Disambiguation】`.
 
 ```markdown
-# [域名] 领域知识库
+# [Domain] Knowledge Base
 
-## §0 目录索引
+## §0 Contents
 
-| § | 标题 | 定位 |
+| § | Title | When |
 |---|------|------|
-| §1 | 业务背景与核心概念 | 首次接触该域时读 |
-| §1.5 | 架构概览 | 快速建立分层认知（mermaid 图） |
-| §2 | 核心业务流程/状态机 | 理解主流程和状态枚举 |
-| §2.5 | 物理路径速查 | 直接定位代码目录（可 glob/ls） |
-| §3 | 代码入口索引 | 按任务场景找入口 |
-| §4 | 表与字段入口索引 | 改表/字段/查询时 |
-| §5 | 流程/组件/任务/MQ 入口索引 | 改流程编排/定时任务/消息时 |
-| §6 | 核心业务规则与隐性约束 | 改代码前必扫的 AI 易错点 |
-| §7 | 验证路径 | 改完后如何验证正确性 |
-| §8 | 关联文档 | 跨域联读指引 |
-| §9 | 覆盖度与待补充项 | 了解文档置信度和缺口 |
+| §1 | Business background and core concepts | First contact with this domain |
+| §1.5 | Architecture overview | Quick layered mental model (mermaid) |
+| §2 | Core business flows / state machines | Main flows and status enums |
+| §2.5 | Physical path cheat sheet | Locate code dirs directly (glob/ls) |
+| §3 | Code entry index | Find entries by task scenario |
+| §4 | Table and field entry index | When changing tables/fields/queries |
+| §5 | Flow / component / job / MQ entry index | When changing orchestration / cron / messaging |
+| §6 | Core business rules and hidden constraints | AI pitfalls to scan before changing code |
+| §7 | Validation paths | How to verify correctness after changes |
+| §8 | Related docs | Cross-domain reading guides |
+| §9 | Coverage and to-be-filled items | Doc confidence and gaps |
 
-## §1 业务背景与核心概念
-[业务定位、服务对象、在整个系统中的职责、核心概念。使用统一主称谓；必要时首次出现用括号补充代码实体 / 枚举 / 主表等实现别名]
+## §1 Business background and core concepts
+[Business positioning, who it serves, role in the system, core concepts. Use unified canonical terms; on first appearance, parenthesize code entity / enum / main table aliases when needed]
 
-## §1.5 架构概览
+## §1.5 Architecture overview
 
-[1-2 张 mermaid 图，快速建立分层调用认知。核心域强制，标准域可选。]
+[1–2 mermaid diagrams for a quick layered call model. Mandatory for core domains; optional for standard domains.]
 
-**图型选择指南**（按域特征选最能降低认知成本的类型）：
+**Diagram selection guide** (pick the type that most reduces cognitive cost for the domain):
 
-| 域特征 | 推荐图型 | mermaid 语法 |
+| Domain trait | Recommended diagram | mermaid syntax |
 |--------|---------|-------------|
-| 分层调用明显（Controller→Service→Repository） | 分层调用链图 | `graph TD` |
-| 状态流转为核心逻辑（订单/审批/账户） | 状态机图 | `stateDiagram-v2` |
-| 事件驱动/异步交互（MQ/Event/回调） | 时序图 | `sequenceDiagram` |
-| 实体关系复杂（多表关联/聚合根） | ER 图 | `erDiagram` |
-| 继承/策略模式（多种实现/插件） | 类层次图 | `classDiagram` |
+| Clear layered calls (Controller→Service→Repository) | Layered call graph | `graph TD` |
+| State transitions are core (order/approval/account) | State machine | `stateDiagram-v2` |
+| Event-driven / async (MQ/Event/callbacks) | Sequence | `sequenceDiagram` |
+| Complex entity relations (multi-table / aggregate roots) | ER | `erDiagram` |
+| Inheritance / strategy (multiple implementations / plugins) | Class hierarchy | `classDiagram` |
 
-- 首选：根据域特征从上表选型，填充项目真实类名
-- 节点标注用实际类名/组件名，不用抽象占位符
-- 复杂域可组合两种图型（如分层图 + 状态图）
+- Prefer: choose from the table by domain trait; fill real project class names
+- Label nodes with actual class/component names—no abstract placeholders
+- Complex domains may combine two types (e.g. layered + state)
 
-## §2 核心业务流程 / 状态机
-[主流程、状态枚举、状态转换、终态、幂等语义、关键分支]
+## §2 Core business flows / state machines
+[Main flows, status enums, transitions, terminal states, idempotency semantics, key branches]
 
-## §2.5 物理路径速查
+## §2.5 Physical path cheat sheet
 
-| 目录（相对项目根） | 内容 | 关键类/文件数 |
+| Directory (relative to project root) | Contents | Key classes / file count |
 |------|------|--------|
-| [完整相对路径，禁止用 `...` 省略] | [该目录包含的代码类型] | [代表类名 或 文件数] |
+| [full relative path; no `...` ellipsis] | [code kinds in this dir] | [representative class names or file count] |
 
-路径必须从项目根写起（如 `src/main/java/com/example/payment/service/`），禁止用 `...` 省略中间路径。Agent 可直接 glob/Read 到目标文件，无需二次搜索确认物理位置。
+Paths must start from the project root (e.g. `src/main/java/com/example/payment/service/`); do not omit middle segments with `...`. Agents should glob/Read the target without a second search for physical location.
 
-## §3 本域代码入口索引
-| 场景 | 入口 | 类/方法/配置 | 说明 |
+## §3 This domain’s code entry index
+| Scenario | Entry | Class/method/config | Notes |
 |---|---|---|---|
-| [做什么任务时] | [接口/服务/组件/任务/MQ] | [路径或符号] | [该入口的职责] |
+| [when doing which task] | [API/service/component/job/MQ] | [path or symbol] | [responsibility] |
 
-## §4 本域表与字段入口索引
-| 表/字段 | Entity/Mapper | 业务语义 | 改动注意 |
+## §4 This domain’s table and field entry index
+| Table/field | Entity/Mapper | Business meaning | Change notes |
 |---|---|---|---|
-| [表名.字段名] | [类名] | [字段含义] | [分表/租户/状态/金额/时间等注意事项] |
+| [table.field] | [class] | [field meaning] | [sharding/tenant/status/money/time notes] |
 
-## §5 本域流程 / 组件 / 任务 / MQ 入口索引
-| 类型 | 标识 | 代码入口 | 适用场景 |
+## §5 This domain’s flow / component / job / MQ entry index
+| Type | Id | Code entry | When used |
 |---|---|---|---|
-| [Flow/Component/Job/MQ/Cache] | [flow_code/topic/key/id] | [类/方法/配置] | [什么时候会用到] |
+| [Flow/Component/Job/MQ/Cache] | [flow_code/topic/key/id] | [class/method/config] | [when it applies] |
 
-## §6 核心业务规则与隐性约束
-- 【禁止】[做法] -> 必须 [正确做法]（原因：[为什么]）
-- 【隐性依赖】做 [A] 之前必须先 [B]，否则 [后果]
-- 【消歧】[概念 A] vs [概念 B]：[区别，能否互传，错用后果]
-- 【叫法统一】[主称谓] 在代码/表/接口中也可能写作 [别名]；文档正文统一使用 [主称谓]，改代码时按入口索引定位实现名（仅在别名会造成误判时写）
-- 【隐式语义】[隐藏机制] 会在 [触发入口] 自动执行 [真实逻辑]，改 [场景] 时必须同时检查 [配置/上下文/生成代码/外部契约]，否则 [AI 易错后果]
-- 【低置信度】[推断内容]（证据：[代码证据]；待确认：[需要用户补充什么]）
-- 【裁定】[YYYY-MM-DD] 经用户确认推翻 [权威源原结论]：[本产品 / 本域的正确结论]（原因：[源头为何过时 / 不适用]）。下次 doc-init/doc-update 读到本条不再翻案，除非用户再次改口；建议同步更新源头文档（如后端 PRD），但本仓不擅自跨仓改。
+## §6 Core business rules and hidden constraints
+- 【Forbidden】[practice] -> must [correct practice] (reason: [why])
+- 【Hidden dependency】before [A] must first [B], else [consequence]
+- 【Disambiguation】[concept A] vs [concept B]: [difference, interchangeable?, wrong-use consequence]
+- 【Naming alignment】[canonical] may also appear as [alias] in code/tables/APIs; body text always uses [canonical]; when changing code, locate implementation names via the entry index (write only when aliases would cause misjudgment)
+- 【Implicit semantics】[hidden mechanism] automatically runs [real logic] at [trigger entry]; when changing [scenario] also check [config/context/generated code/external contracts], else [AI pitfall consequence]
+- 【Low confidence】[inference] (evidence: [code]; pending: [what user must fill])
+- 【Ruling】[YYYY-MM-DD] User confirmed overturning [original authoritative conclusion]: [correct conclusion for this product/domain] (reason: [why source is outdated/inapplicable]). Future doc-init/doc-update that reads this must not reverse it unless the user changes their mind again; recommend syncing the source doc (e.g. backend PRD), but this repo must not edit across repos on its own.
 
-**AI 易错点标签规范**：每个隐性约束条目若属于"AI 不看文档就会犯的错"（如忘记设置上下文、忘记带版本号更新、用错字段名），用 `**AI 易错点**` 前缀标记。这让后续 Agent 快速扫描时能立即定位最危险的约束。在 depth_scanner.py 输出中被标记为 concurrency_patterns、idempotency_patterns、soft_delete_patterns 的条目默认都应标记为 AI 易错点。
+**AI pitfall tag rule:** If a hidden-constraint item is a mistake AI would make without reading docs (forgetting context, forgetting versioned updates, wrong field names), prefix with `**AI pitfall**`. That lets later Agents scan for the most dangerous constraints immediately. Items tagged concurrency_patterns, idempotency_patterns, or soft_delete_patterns in depth_scanner.py output should default to AI pitfall tags.
 
-## §7 常见易忽略条件与验证路径
-- 改 [场景] 后：运行/调用 [命令或接口]，检查 [日志/表/流程记录/缓存]
-- 注意：[本域常见但代码不直接提醒的生效条件]
+## §7 Common easy-to-miss conditions and validation paths
+- After changing [scenario]: run/call [command or API], check [logs/tables/flow records/cache]
+- Note: [effect conditions common in this domain but not directly reminded by code]
 
-**验证路径不允许为空**。若无法从运行验证获得真实命令，至少根据代码扫描结果生成以下类型的验证路径模板：
+**Validation paths must not be empty.** If real commands cannot come from runtime validation, at least generate template validation paths from code scan:
 
-- 数据库验证（适用于有持久化操作的场景）：`SELECT <key_fields> FROM <main_table> WHERE <condition> -- 确认 <字段> 已变更为预期值`
-- 日志验证（适用于有日志输出的场景）：`grep '<关键字|异常类名>' <日志路径> | tail -5`
-- API 验证（适用于有 HTTP 接口的场景）：`curl -s -X POST http://127.0.0.1:<port>/<path> -H 'Content-Type: application/json' -d '<最小请求体>'`
-- 缓存/状态刷新验证（适用于有缓存机制的场景）：`curl -s -X POST http://127.0.0.1:<port>/<refresh_path>`
-- 编译验证（适用于编译型语言）：`<build_command> && echo "编译通过"`
-- 单测验证（适用于有测试的场景）：`<test_command> -t <TestClass>#<testMethod>`
+- DB validation (persistence scenarios): `SELECT <key_fields> FROM <main_table> WHERE <condition> -- confirm <field> changed to expected value`
+- Log validation (logging scenarios): `grep '<keyword|exception class>' <log_path> | tail -5`
+- API validation (HTTP scenarios): `curl -s -X POST http://127.0.0.1:<port>/<path> -H 'Content-Type: application/json' -d '<minimal body>'`
+- Cache/state refresh (caching scenarios): `curl -s -X POST http://127.0.0.1:<port>/<refresh_path>`
+- Compile validation (compiled languages): `<build_command> && echo "build ok"`
+- Unit-test validation (when tests exist): `<test_command> -t <TestClass>#<testMethod>`
 
-将模板中的 `<placeholder>` 替换为该领域的真实入口。标低置信度的验证路径加注「待运行验证确认」。
+Replace `<placeholder>` with this domain’s real entries. Low-confidence validation paths note “pending runtime validation”.
 
-## §8 关联文档
-- [GUIDE 文档]：覆盖 [公共机制/专项机制] 的机制细节，涉及该机制时联读
-- [其他领域知识库]：涉及 [跨域场景] 时联读
+## §8 Related docs
+- [GUIDE doc]: covers [shared/specialized mechanism] details; read together when that mechanism is involved
+- [Other domain KB]: read together for [cross-domain scenarios]
 
-## §9 覆盖度与待补充项
-- 代码推断覆盖：[实体/状态/入口/表/流程等覆盖情况]
-- 领域语言统一：[主称谓是否已确认；仍待确认的别名 / 冲突叫法]
-- 用户 / 资料补充：[需求文档、接口文档、测试用例、日志入口、老手经验等来源]
-- 多源证据补强：[已读取的测试/接口契约/前端/配置/迁移/日志/外部契约/权限字典/生成元数据/运行时证据；只列与本域有关且确实补强认知的证据]
-- Q&A 补充：[N 条隐性约束 / M 个概念消歧 / K 条验证路径]
-- 待补充：[代码和当前 Q&A 都无法覆盖的业务经验；未读取测试断言、未验证运行时 SQL、未确认前端菜单叫法、未连接配置中心等高价值缺口]
+## §9 Coverage and to-be-filled items
+- Code-inference coverage: [entities/status/entries/tables/flows coverage]
+- Domain-language unification: [canonical confirmed?; aliases / conflicting names still pending]
+- User / materials: [requirements, API docs, test cases, log entry points, veteran experience]
+- Multi-source evidence enrichment: [tests/API contracts/frontend/config/migrations/logs/external contracts/permission dicts/generated metadata/runtime evidence actually read; only list evidence that truly reinforced this domain]
+- Q&A supplements: [N hidden constraints / M disambiguations / K validation paths]
+- To be filled: [business experience neither code nor current Q&A covers; unread test assertions, unverified runtime SQL, unconfirmed frontend menu names, unconnected config center, and other high-value gaps]
 
-<!-- 该文档由 doc-init 生成于 YYYY-MM-DD；定位：AI 修改本业务域前的快速参考文档 -->
+<!-- Generated by doc-init on YYYY-MM-DD; positioning: quick reference before AI changes this business domain -->
 ```
 
-历史故障和真实踩坑不要伪造。若用户在 Q&A 中主动补充已发生问题，可以写成「常见易忽略条件」或「待 doc-update 沉淀」；若缺少证据，必须标低置信度或待补充。
+Do not fabricate historical incidents or real pitfalls. If the user volunteers past issues in Q&A, you may write “common easy-to-miss conditions” or “pending doc-update persistence”; without evidence, mark low confidence or to be filled.
 
-文档生成后立即在根 `AGENTS.md` 文档导航里加对应条目。导航段应在表头或分组标题处统一声明触发模式（如「以下文档在涉及对应领域的开发、评审或排查时先读取」），每条只写该文档覆盖的**业务范围关键词**，不重复声明"前必读"。这样 Agent 靠关键词做路由，不被重复的公式淹没。
+Immediately after generating a doc, add a nav entry in root `AGENTS.md`. The nav section should declare the trigger pattern once in the header or group title (e.g. “Read the following docs first when developing, reviewing, or troubleshooting the matching domain”), and each item only lists that doc’s **business-scope keywords**—do not repeat “must read before…”. Agents route by keywords without drowning in repeated formulas.
 
-正例（表头已声明通用触发规则，每条只写区分信息）：
+Good (header declares the shared trigger; each item only has distinguishing info):
 ```md
-> 以下文档在涉及对应领域的开发、评审或排查时先读取。
+> Read the following docs first when developing, reviewing, or troubleshooting the matching domain.
 
-- `docs/CUSTOMER_KB.md`：客户资料变更、状态流转、标签批量操作、客户查询口径
-- `docs/TIER_KB.md`：层级体系、升降级规则、保级到期、等级有效期计算
-- `docs/VERSION_MANAGEMENT.md`：子配置 CRUD、DRAFT/RELEASE 生命周期、"打开即变草稿"问题
+- `docs/CUSTOMER_KB.md`: customer profile changes, status transitions, batch tags, customer query semantics
+- `docs/TIER_KB.md`: tier system, upgrade/downgrade rules, retention expiry, tier validity calculation
+- `docs/VERSION_MANAGEMENT.md`: sub-config CRUD, DRAFT/RELEASE lifecycle, "opens as draft" issue
 ```
 
-反例：「说明客户模块的业务逻辑」（只罗列内容，不含触发信号）；所有条目都写「改、评审或排查 X 前必读」（公因式未提取，全是噪音重复）。
+Bad: “explains customer-module business logic” (content dump, no trigger signals); every item writes “must read before changing, reviewing, or troubleshooting X” (shared factor not extracted—pure noise).
 
-回写导航优先使用 `scripts/upsert_agents_nav.py`，避免重复条目和格式漂移：
+Prefer `scripts/upsert_agents_nav.py` for nav writes to avoid duplicates and format drift:
 
 ```bash
-python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py --root . --path docs/<DOMAIN>_KNOWLEDGE_BASE.md --when-to-read "<何时该读>"
+python3 <DOC_INIT_DIR>/scripts/upsert_agents_nav.py --root . --path docs/<DOMAIN>_KNOWLEDGE_BASE.md --when-to-read "<when to read>"
 ```
 
-## Guide 模板
+## Guide template
 
-当识别出跨领域公共机制或复杂专项机制时，生成 `docs/<TOPIC>_GUIDE.md`。Guide 只抽复杂机制，不替代领域知识库；相关领域 KB 必须保留本域入口和本域使用方式。
+When a cross-domain shared mechanism or complex specialized mechanism is identified, generate `docs/<TOPIC>_GUIDE.md`. Guides extract complex mechanisms only—they do not replace domain KBs; related domain KBs must keep this domain’s entries and usage.
 
-生成前先做粒度判断：
+Granularity judgment before generating:
 
-- 若机制影响多个业务域，且 AI 改代码前需要先理解一套独立运行时流水线或真实生效机制，生成 Guide。
-- 若机制只服务于一个业务域，写入对应领域知识库的「核心业务规则与隐性约束」。
-- 若多个隐藏点属于同一流水线，合并成一篇 Guide；不要按注解、字段、hook、单个配置项拆成多篇小文档。
-- 若只是历史事故或一次性故障，不在 doc-init 阶段生成。
+- If the mechanism affects multiple business domains and AI needs an independent runtime pipeline / real-effect model before changing code → Guide.
+- If it only serves one business domain → write into that domain KB’s “Core business rules and hidden constraints”.
+- If multiple hidden points belong to one pipeline → merge into one Guide; do not split by annotation, field, hook, or single config key into many tiny docs.
+- Historical accidents or one-off failures → do not generate during doc-init.
 
 ```markdown
-# [机制名] Guide
+# [Mechanism] Guide
 
-## 文档定位
-[本 Guide 覆盖的机制边界、适用模块 / 领域、主要入口和不覆盖的内容。不要重复根 AGENTS.md 的「何时该读」导航句。]
+## Document positioning
+[Mechanism boundaries this Guide covers, applicable modules/domains, main entries, and what it does not cover. Do not repeat root AGENTS.md “when to read” routing sentences.]
 
-## 机制定位
-[它解决什么问题，被哪些业务域依赖]
+## Mechanism positioning
+[What problem it solves; which business domains depend on it]
 
-## 核心入口
-| 场景 | 入口 | 代码/配置 | 说明 |
+## Core entries
+| Scenario | Entry | Code/config | Notes |
 |---|---|---|---|
 
-## 使用约束
-- 【必须】[必须遵守的机制规则]
-- 【禁止】[看似合理但项目里不能这么做的方式]
-- 【隐性依赖】[使用该机制前后要同步处理的动作]
+## Usage constraints
+- 【Must】[mechanism rules that must be followed]
+- 【Forbidden】[approaches that look reasonable but are not allowed in this project]
+- 【Hidden dependency】[actions that must sync before/after using the mechanism]
 
-## 领域引用
-- [DOMAIN_A_KNOWLEDGE_BASE.md]：[该领域如何使用此机制]
-- [DOMAIN_B_KNOWLEDGE_BASE.md]：[该领域如何使用此机制]
+## Domain references
+- [DOMAIN_A_KNOWLEDGE_BASE.md]: [how this domain uses the mechanism]
+- [DOMAIN_B_KNOWLEDGE_BASE.md]: [how this domain uses the mechanism]
 
-## 待补充
-- [代码无法还原、需要用户或后续 doc-update 补充的内容]
+## To be filled
+- [Content code cannot reconstruct; needs user or later doc-update]
 ```
 
-Guide 生成后，同步回写相关领域知识库的「关联文档」章节，并在根 `AGENTS.md` 中添加任务触发式导航。
+After generating a Guide, sync the “Related docs” sections of related domain KBs, and add task-triggered nav in root `AGENTS.md`.
 
-Guide 的根导航同样用 `scripts/upsert_agents_nav.py` 回写。
+Guide root nav also uses `scripts/upsert_agents_nav.py`.
 
-## 根 AGENTS.md
+## Root AGENTS.md
 
-优先创建或更新根 `AGENTS.md` 框架，再生成 `docs/` 文档；每生成一份长期文档后立即回写导航，避免中途失败留下无法从根入口发现的孤儿文档。
+Prefer creating/updating the root `AGENTS.md` frame first, then generating `docs/`; after each long-lived doc, immediately write nav so a mid-run failure does not leave orphan docs undiscoverable from the root entry.
 
-根 `AGENTS.md` 包含：
+Root `AGENTS.md` includes:
 
-- 项目简介：2-3 句，说明是什么、服务谁、核心技术特征。
-- 代码约定：框架选型、必须/禁止的编码模式。
-- 验证章节：如何启动、如何验证典型改动。
-- 文档导航：按任务触发场景路由到领域知识库和 Guide。
+- Project intro: 2–3 sentences—what it is, whom it serves, core tech traits.
+- Coding conventions: framework choices, must/forbidden coding patterns.
+- Validation: how to start, how to validate typical changes.
+- Doc navigation: route to domain KBs and Guides by task trigger.
 
-### 运维速查段（仅可运行项目）
+### Ops cheat sheet (runnable projects only)
 
-当 `depth_scanner.py` 输出的 `runnable_project.type` 不是 `library`/`cli`/`unknown` 时，在根 AGENTS.md 中生成此段：
+When `depth_scanner.py` `runnable_project.type` is not `library`/`cli`/`unknown`, generate this section in root AGENTS.md:
 
 ```markdown
-## 运维速查
+## Ops cheat sheet
 
-| 服务 | 端口 | 启动命令 | 日志路径 |
+| Service | Port | Start command | Log path |
 |------|------|---------|---------|
-| [从 depth_scanner 输出填充] | | | |
+| [fill from depth_scanner output] | | | |
 
-### 构建命令
-- [从 inventory 的 build_system 推导]
+### Build commands
+- [derive from inventory build_system]
 
-### 常见编译问题
-- [从 Git 历史 fix/revert 和代码扫描中提取，初始可为空]
+### Common compile issues
+- [extract from Git fix/revert history and code scan; may start empty]
 ```
 
-纯库/SDK/CLI 工具项目不生成此段，把「如何验证」写进根 AGENTS.md 的项目行为规范或对应 Guide。
+Pure library/SDK/CLI tool projects skip this section; put “how to validate” into root AGENTS.md project behavior rules or the relevant Guide.
 
-项目根 `AGENTS.md` 不得引用用户级或全局指令文件，例如不要写 `@~/.claude/CLAUDE.md`。全局规范由客户端自动加载；项目根 `AGENTS.md` 只承载本项目规则、验证方式和文档导航。
+Project-root `AGENTS.md` must not reference user-level or global instruction files, e.g. do not write `@~/.claude/CLAUDE.md`. Global rules are loaded by the client automatically; project-root `AGENTS.md` only carries this project’s rules, validation methods, and doc nav.
 
-导航规则：
+Nav rules:
 
-- 领域知识库优先：按业务模块 / 业务领域 / 业务条线聚类，高频领域靠前。
-- 公共 Guide 次之：流程编排、分表路由、权限、插件组件、操作验证等横向机制放在领域知识库之后。
-- 每条只写业务范围关键词（如「支付回调、退款、对账逻辑」），通用触发模式在段表头声明一次。
-- 不按技术资源平铺：不要把表、类、接口作为根导航主结构；这些索引放进对应领域知识库。
+- Domain KBs first: cluster by business module / domain / line; high-frequency domains earlier.
+- Shared Guides next: flow orchestration, sharding routing, permissions, plugin components, ops validation, and other horizontal mechanisms after domain KBs.
+- Each item only business-scope keywords (e.g. “payment callbacks, refunds, reconciliation”); declare the shared trigger pattern once in the section header.
+- Do not flatten by tech resource: do not make tables/classes/APIs the main root-nav structure; those indexes live in the corresponding domain KB.
 
-生成或更新完成后运行：
+After generate/update, run:
 
 ```bash
 python3 <DOC_INIT_DIR>/scripts/doc_nav_lint.py --root .
 ```
 
-若存在 error，先修复再结束；若存在 warning，要么修复，要么在自评里说明为什么暂时接受。
+Fix errors before finishing; for warnings, either fix or explain in self-assessment why they are temporarily accepted.
 
-## 根 CLAUDE.md
+## Root CLAUDE.md
 
-直接写入或规范化为单行：
+Write or normalize to a single line:
 
 ```markdown
 @AGENTS.md
 ```
 
-`CLAUDE.md` 只能作为 Claude Code 进入项目根 `AGENTS.md` 的指针，不写项目规则、文档导航或全局规则。
+`CLAUDE.md` is only Claude Code’s pointer into project-root `AGENTS.md`—no project rules, doc nav, or global rules.
 
 ## .gitignore
 
-检查是否包含 `DRAFT_*.md` 和 `*-draft.md`，缺失则提示添加。
+Check for `DRAFT_*.md` and `*-draft.md`; if missing, suggest adding them.
 
 ---
 
-## 深写规范
+## Deep-write standards
 
-### 深写回合制（每个领域 KB 生成必须经过）
+### Deep-write rounds (required for every domain KB)
 
-每个领域 KB 不是"扫一遍写一遍"，必须至少完成 2 个回合（核心域强制 3 个）：
+Each domain KB is not “scan once, write once”—complete at least 2 rounds (core domains mandatory 3):
 
-**回合 1 — 纵向追踪**：从"用户触发入口"（Controller/API/CLI）沿调用链追踪到"数据持久化"（Repository/Mapper/表），记录每层关键类名、方法签名、状态转换逻辑。跨模块不要停。**同步记录每层代码的完整物理路径**（从项目根起，不省略），回合结束后汇总到 §2.5。
+**Round 1 — Vertical trace:** From “user trigger entry” (Controller/API/CLI) along the call chain to “data persistence” (Repository/Mapper/table); record key class names, method signatures, and status-transition logic at each layer. Do not stop across modules. **Also record each layer’s full physical path** (from project root, no ellipsis); after the round, summarize into §2.5.
 
-**回合 2 — 横向扫描**：在已追踪的入口中寻找并发控制（@Version/锁/CAS）、幂等机制（唯一键/去重）、事件发布（Event/MQ）、定时任务触发、异常兜底策略，每条写入 §6。§6 不足 3 条则继续扫。
+**Round 2 — Horizontal scan:** In already-traced entries, find concurrency control (@Version/locks/CAS), idempotency (unique keys/dedupe), event publish (Event/MQ), cron triggers, exception fallback strategies—write each into §6. If §6 has fewer than 3 items, keep scanning.
 
-**回合 3（核心域强制，标准域可选）**：
-1. **实体字段语义扫描**：打开主实体类，逐字段检查：NULL 是否有特殊业务语义、同名字段跨表含义是否不同、外键实际指向是否与命名暗示不一致、`version`/`biz_status` 等隐式框架行为字段。
-2. **JSON/DSL 字段格式提取**：若 depth_scanner 的 `json_field_patterns` 命中此域，追踪反序列化 DTO，提取格式规范写入 §6。
-3. **表字段完整索引**：§4 核心域必须列出主表和关键关联表的关键字段（主键、状态字段、分片键、外键、金额/余额字段、时间字段），标注类型和业务语义。
+**Round 3 (mandatory for core; optional for standard):**
+1. **Entity field semantics scan:** Open main entity classes; per field check: whether NULL has special business meaning, whether same-named fields differ across tables, whether FK targets disagree with naming hints, implicit framework fields like `version`/`biz_status`.
+2. **JSON/DSL field format extraction:** If depth_scanner `json_field_patterns` hits this domain, trace deserialize DTOs and extract format rules into §6.
+3. **Complete table/field index:** Core-domain §4 must list key fields of the main table and key related tables (PK, status, shard keys, FKs, money/balance, time fields) with types and business meaning.
 
-**回合 2 完成后（核心域强制）**：用回合 1 追踪的分层结构，绘制 §1.5 的 mermaid 图。根据域特征从图型选择指南中选择最合适的图型，节点使用实际类名，不用抽象占位符。
+**After Round 2 (mandatory for core):** From Round 1’s layered structure, draw §1.5 mermaid diagrams. Pick the best type from the diagram selection guide; use real class names—no abstract placeholders.
 
-**§2.5 物理路径数据来源**：优先从 `depth_scanner.py` 输出的 `framework_components[].file_path` 和 `entity_fields[].file_path` 提取目录，去重后直接填充 §2.5 表格。Sub-agent 不必重新遍历目录结构——scanner 已经做过。
+**§2.5 physical-path data source:** Prefer directories from `depth_scanner.py` `framework_components[].file_path` and `entity_fields[].file_path`; dedupe and fill the §2.5 table. Sub-agents need not re-walk the tree—the scanner already did.
 
-**禁止**只用 sub-agent 的模块级摘要作为生成依据——sub-agent 扫描是"候选发现"，深写必须回到代码验证关键断言。
+**Forbidden:** using only a sub-agent’s module-level summary as generation basis—sub-agent scan is “candidate discovery”; deep-write must return to code to verify key assertions.
 
-**锚定规则（硬约束）**：文档中引用代码位置时，**禁止使用行号**（如"第 535 行"、"Line 42"），必须使用 `类名.方法名()` 或 `类名.方法名() → 被调用方法名()` 格式。方法名是稳定的，行号会随代码演进漂移导致文档失效。
+**Anchoring rule (hard):** When citing code locations, **do not use line numbers** (e.g. “line 535”, “Line 42”); use `ClassName.methodName()` or `ClassName.methodName() → CalledMethod()`. Method names are stable; line numbers drift and invalidate docs.
 
-**行号替换操作指引**（供 doc-compact 执行时参考）：遇到文档中的行号引用时，先 Read 该文件对应行号确认当前方法名，再用 `类名.方法名()` 替换原文的行号引用。不可凭猜测替换。
+**Line-number replacement ops guide** (for doc-compact): when seeing line-number citations, Read that file at the line to confirm the current method name, then replace with `ClassName.methodName()`. Do not guess.
 
-**每份 KB 的行数参考**：核心域至少 300 行（含表格和代码块），标准域至少 150 行。低于此水位说明 §3 入口不全、§6 隐性约束不足、§7 验证路径缺失，必须对照质量闸门回补。
+**Line-count reference per KB:** core domains ≥ 300 lines (including tables and code blocks); standard ≥ 150. Below that watermark means thin §3 entries, insufficient §6 hidden constraints, or missing §7 validation paths—backfill against quality gates.
 
-### 深写质量闸门（每个 KB 生成后立即自检）
+### Deep-write quality gates (self-check immediately after each KB)
 
-| section | 最低要求 | 不满足时 |
+| section | Minimum | If unmet |
 |---------|---------|---------|
-| §2 核心流程/状态机 | 至少一个状态图或核心流程描述 | 从 `status_patterns` 补充；纯 CRUD 域用请求处理流程代替 |
-| §3 代码入口索引 | 至少 3 个入口（Controller/Service/Handler/CLI command） | 从 `framework_components` 补充 |
-| §4 表/字段入口 | 核心域：主表+关键关联表的关键字段（类型+语义）；标准域：至少主表和分片键/主键 | 从 `entity_fields` + db_miner catalog 补充 |
-| §6 隐性约束 | 至少 3 条，其中至少 1 条标记 **AI 易错点** | 从 `concurrency_patterns`/`idempotency_patterns`/`soft_delete_patterns` 补充 |
-| §7 验证路径 | 不允许为空 | 至少生成模板级验证路径（见上方验证路径模式库） |
-| §0 目录索引 | 所有 KB 强制包含（10 行 § 目录表） | 从模板复制，按实际生成的 § 段落调整 |
-| §1.5 架构概览 | 核心域：至少 1 张 mermaid 图（图型由域特征决定）；标准域：可选 | 按图型选择指南，从回合 1 追踪结果提取结构绘制 |
-| §2.5 物理路径速查 | 核心域：至少 4 个目录行；标准域：至少 2 个目录行 | 从回合 1 纵向追踪时记录的完整物理路径汇总 |
+| §2 Core flows/state machines | At least one state diagram or core-flow description | Supplement from `status_patterns`; pure CRUD domains use request-handling flow instead |
+| §3 Code entry index | ≥ 3 entries (Controller/Service/Handler/CLI command) | Supplement from `framework_components` |
+| §4 Table/field entries | Core: key fields of main + related tables (type+meaning); standard: at least main table and shard key/PK | Supplement from `entity_fields` + db_miner catalog |
+| §6 Hidden constraints | ≥ 3 items, ≥ 1 tagged **AI pitfall** | Supplement from `concurrency_patterns`/`idempotency_patterns`/`soft_delete_patterns` |
+| §7 Validation paths | Must not be empty | At least template-level paths (see validation path patterns above) |
+| §0 Contents | Mandatory for all KBs (10-row § table) | Copy from template; adjust to sections actually generated |
+| §1.5 Architecture overview | Core: ≥ 1 mermaid diagram (type by domain trait); standard: optional | Draw from Round 1 trace using the diagram selection guide |
+| §2.5 Physical path cheat sheet | Core: ≥ 4 directory rows; standard: ≥ 2 | Summarize full physical paths recorded in Round 1 vertical trace |
 
-**核心域额外要求**（Git 热点 + 用户点名）：§6 至少 5 条（其中至少 2 条来自回合 3 字段语义扫描）、§7 至少 2 条可执行命令、§4 必须包含关键字段语义表。
+**Extra for core domains** (Git hotspots + user-named): §6 ≥ 5 items (≥ 2 from Round 3 field-semantics scan), §7 ≥ 2 executable commands, §4 must include a key-field semantics table.

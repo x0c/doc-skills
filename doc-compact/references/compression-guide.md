@@ -1,128 +1,130 @@
-# 压缩操作指南
+# Compression playbook
 
-## 压缩哲学
+## Compression philosophy
 
-**目标读者是 AI Coding Agent**——不是人类工程师、不是项目经理、不是技术负责人。这决定了什么算"改变动作"：
+**The intended reader is an AI coding agent**—not a human engineer, project manager, or tech lead. That defines what counts as “changing an action”:
 
-- Agent 靠**精确标识符**（类名、方法名、表名、字段名、配置 key）路由到代码，叙述性描述路由不了
-- Agent 靠**可执行命令**（curl、SQL、编译命令、测试命令）验证结果，"注意检查"验证不了
-- Agent 靠**结构化入口**（表格行、索引条目、§ 锚点）定位信息，段落文字定位不了
+- Agents route to code via **precise identifiers** (class, method, table, field, config key); narrative descriptions do not route
+- Agents verify via **executable commands** (curl, SQL, build, test); “please check carefully” does not verify
+- Agents locate information via **structured entry points** (table rows, index entries, § anchors); paragraph prose does not locate well
 
-由此推导出压缩不只是"删冗余"，还有**形式转化**：
+So compression is not only “delete redundancy”—it also includes **form conversion**:
 
-| 原始形式 | 压缩后形式 | 为什么 |
-|---------|-----------|-------|
-| 叙述性段落描述调用关系 | `A.method() → B.method() → C.method()` 调用链 | Agent 可直接跳转 |
-| 自然语言描述表结构 | `表名.字段(类型): 语义` 一行式 | Agent 可直接 SQL |
-| "第 X 行有个重要逻辑" | `ClassName.targetMethod()` 方法名锚定 | 行号会漂移 |
-| 长段落解释某配置含义 | `config.key = value // 效果` 一行注释 | Agent 读配置就够 |
-
----
-
-## 核心判据
-
-**这句话会改变读者的动作或判断吗？不会就删。**
-
-进一步细化——针对 Agent 读者的三条子判据：
-
-1. **路由判据**：这段内容能帮 Agent 定位到正确的文件/类/方法吗？能 → 保留（优先结构化）；不能 → 看下一条
-2. **决策判据**：这段内容会改变 Agent 选择方案 A 还是方案 B 吗？会 → 保留为规则/约束条目；不会 → 看下一条
-3. **验证判据**：这段内容能帮 Agent 确认改动是否正确吗？能 → 保留为可执行验证命令；不能 → 可删
-
-三条都不命中 = 可以安全删除。
-
-### 删（不改变行为）
-
-| 类型 | 示例 |
-|------|------|
-| 交叉引用 | 「另见 §X.Y」但 §X.Y 就在下面 |
-| 复述 | 重复标题 / frontmatter / 上文已说的内容 |
-| 重复提醒 | 同一条纪律多处出现 → 保留最完整一处，其余删 |
-| 死动机 | 不影响判断的背景解释、客套、「需要注意的是」 |
-| 历史沿革 | 「以前叫 X」「已废弃」→ 属 git log |
-| 空占位 | 「暂无」、空 TODO、「待补充」 |
-| 行号引用 | 「第 N 行」「Line N」→ 替换为 `类名.方法名()` 锚定后删除原行号 |
-| Agent 不消费的叙述 | "这个模块负责处理..."、"系统的核心能力是..."、"该功能的设计思路是..." — 这类「产品介绍」式叙述对 Agent 改代码无指导价值，Agent 需要的是入口和约束 |
-
-### 留（改变动作 / 判断，删了就失真）
-
-- 数字 / 阈值、标识符（类名 / 字段 / 接口 / 枚举 / 配置 key）
-- 边界条件、例外、不变量、安全约束、外部契约
-- 会翻转决策的那一句动机（删了方向就变）
-- `§2.5 物理路径速查` 表格——Agent 定位代码的直接入口，不可删不可压
-- `§1.5 架构概览` 的 mermaid 图——快速建立整体认知的关键入口，不可删不可压
-- `§0 目录索引` 表格——KB 内部快速导航入口，不可删不可压
-- 方法名锚定引用（如 `ClassName.method() → callee()`）——稳定的代码定位信息，不可删
-
-### 去重
-
-同一事实多处 → 留信息最全的一处，其余删或改为一句指向。确认是同一数字 / 边界 / 例外才算重复。
-
-### 形式转化（压而不删）
-
-有些内容信息有价值但表达形式低效。不要删，转化为 Agent 可高效消费的形式：
-
-| 信号 | 转化操作 | 示例 |
-|------|---------|------|
-| 叙述性调用关系描述 ≥ 3 行 | 转为一行调用链：`A → B → C` | "Controller 调 Service，Service 调 Builder，Builder 调 Mapper" → `XxxController.create() → XxxService.doCreate() → XxxBuilder.build() → XxxMapper.insert()` |
-| 自然语言罗列字段含义 ≥ 5 行 | 转为表格 | |
-| 重复出现的 if-else 逻辑说明 | 转为决策表 `\| 条件 \| 走分支 \| 结果 \|` | |
-| 多段描述同一张表的不同字段 | 合并为一个 §4 表格行 | |
-| 散落在各处的同一机制约束 | 合并到 §6 的一条完整规则 | |
-
-**转化不是重写**：转化后的内容必须比原文更短且信息无损。如果转化后反而更长，保持原样。
-
-### 易变事实（单一来源）
-
-发现某具体数字散落多处时：
-- **权威源文档**：保留，确认是唯一维护点
-- **其他文档**：提炼出不随该数字变化的结论句，删掉数字——不要改成链接（链接越多耦合越重）
-- 如果发现自己把多个文档都改成「→ 链接到权威源」，立即停——这是反模式
+| Original form | Compressed form | Why |
+|---------------|-----------------|-----|
+| Narrative paragraphs describing call relationships | `A.method() → B.method() → C.method()` call chain | Agent can jump directly |
+| Natural-language table structure | one-line `table.field(type): meaning` | Agent can write SQL directly |
+| “Important logic on line X” | `ClassName.targetMethod()` method-name anchor | Line numbers drift |
+| Long paragraph explaining a config | `config.key = value // effect` one-line comment | Reading the config is enough |
 
 ---
 
-## 发现异常顺手修复（禁止推迟）
+## Core criterion
 
-压缩过程中发现的文档异常不属于「压缩」，但本轮已经建立全量上下文，推迟等于把修复成本转嫁给一个没有上下文的未来会话——一律当场修，禁止以「移交 doc-update」「下次统一处理」等理由推迟：
+**Would this sentence change the reader’s action or judgment? If not, delete it.**
 
-| 异常 | 处置 |
-|------|------|
-| 章号跳号/重复、重复小节标题、表格渲染破裂（空行断表/表头错位） | 单文件内直接修；重排会导致其他章节编号变化的，grep 全仓引用同步后再修 |
-| 悬空 § 引用（指向不存在的小节） | 找到正确目标重新锚定；找不到目标改写为自包含表述 |
-| 小节乱序 | 重排 + grep 全仓引用（外部文档可能按 §N.N 引用）同步 |
-| 表名/类名/路径疑似与代码不符 | 对照源码验证（实体类/@TableName/目录结构/脚本入口）：属实→当场修；无法验证→标 `待核实` 回传报告，**不猜** |
-| 跨文档重复未收敛 | 按「易变事实单一来源」当场收敛，权威源留全量、其余降为一句结论或指针 |
+Refined for an agent reader—three sub-criteria:
 
-分级执行：单文件内可修且不波及外部引用的，subagent 直接修并计入账目；会波及外部引用或需跨片判断权威源的，回传主 agent 当场修——高风险的语义是「主 agent 核查影响面后修」，不是「列出来然后不做」。
+1. **Routing:** Does this help the agent locate the right file/class/method? Yes → keep (prefer structured); no → next
+2. **Decision:** Does this change whether the agent picks plan A or plan B? Yes → keep as a rule/constraint; no → next
+3. **Verification:** Does this help the agent confirm a change is correct? Yes → keep as an executable verification command; no → deletable
 
-唯一允许留到收工报告不修的：内容矛盾且无代码证据可裁定（谁对谁错是产品/设计决策）→ 报告请用户裁定。这属于安全边界，不属于推迟修复。
+None of the three hit = safe to delete.
+
+### Delete (behavior unchanged)
+
+| Type | Examples |
+|------|----------|
+| Cross-refs | “See also §X.Y” when §X.Y is immediately below |
+| Restatement | Repeating the title / frontmatter / something already said above |
+| Duplicate reminders | Same discipline in many places → keep the fullest one, delete the rest |
+| Dead motivation | Background that does not change judgment, politeness, “it is worth noting that” |
+| Historical narrative | “Formerly called X,” “deprecated” → belongs in git log |
+| Empty placeholders | “None yet,” empty TODO, “to be filled” |
+| Line-number refs | “Line N” / “第 N 行” → replace with `ClassName.method()` anchors, then drop the line number |
+| Narrative agents do not consume | “This module is responsible for…,” “The system’s core capability is…,” “The design idea for this feature is…” — product-brochure prose has no guidance value for code changes; agents need entry points and constraints |
+
+### Keep (changes action / judgment; deleting would distort)
+
+- Numbers / thresholds, identifiers (class / field / API / enum / config key)
+- Boundary conditions, exceptions, invariants, safety constraints, external contracts
+- The one motivation sentence that would flip a decision (delete it and the direction changes)
+- `§2.5` physical path quick-lookup tables — direct entry for agents locating code; do not delete or compress
+- `§1.5` architecture-overview mermaid — key entry for building a whole-system picture; do not delete or compress
+- `§0` TOC tables — in-KB navigation entry; do not delete or compress
+- Method-name anchors (e.g. `ClassName.method() → callee()`) — stable code location; do not delete
+- Paired `<!-- name:begin/end -->` 🔒 managed blocks in AGENTS.md (including `managed:inherited-agents`) — preserve verbatim in Steps 4/5; do not compress or delete
+
+### Deduplicate
+
+Same fact in multiple places → keep the fullest one; delete others or reduce to one pointer sentence. Count as duplicate only when it is the same number / boundary / exception.
+
+### Form conversion (compress without deleting)
+
+Some content is valuable but inefficient in form. Do not delete—convert to a form agents consume efficiently:
+
+| Signal | Conversion | Example |
+|--------|------------|---------|
+| Narrative call relationships ≥ 3 lines | One-line call chain: `A → B → C` | “Controller calls Service, Service calls Builder, Builder calls Mapper” → `XxxController.create() → XxxService.doCreate() → XxxBuilder.build() → XxxMapper.insert()` |
+| Natural-language field meanings ≥ 5 lines | Convert to a table | |
+| Repeated if-else explanations | Decision table `\| condition \| branch \| result \|` | |
+| Multiple paragraphs on different fields of the same table | Merge into one §4 table row | |
+| Same mechanism constraints scattered around | Merge into one complete rule under §6 | |
+
+**Conversion is not rewriting:** the result must be shorter than the original and information-preserving. If conversion gets longer, leave the original.
+
+### Volatile facts (single source of truth)
+
+When a concrete number is scattered in many places:
+- **Authoritative source doc:** keep it; confirm it is the only maintenance point
+- **Other docs:** distill a conclusion that does not change when the number changes; delete the number—do not turn it into a link (more links = more coupling)
+- If you find yourself rewriting many docs to “→ link to the authority,” stop immediately—that is an anti-pattern
 
 ---
 
-## 按文档类型分配压缩力度
+## Fix anomalies on discovery (no deferral)
 
-不同类型的压缩空间差异极大，用同一把尺审计会漏掉大量冗余：
+Anomalies found during compression are not “compression,” but this round already has full context; deferral dumps the fix cost on a future session with no context—fix on the spot. Do not defer with “hand to doc-update” or “handle next time”:
 
-| 类型 | 典型压缩空间 | 重点审计内容 |
-|------|------------|------------|
-| 排障记录 `troubleshooting/` | **大（可达 80%+）** | 流水账叙述、重复验证步骤、无价值附录、「总结」复读根因、「审核人/下次审查」元数据 |
-| 设计方案 `design/` | 中（10–30%） | 「行业背景」「动机」大段铺垫、已废弃方案完整描述 |
-| 操作手册 / Playbook | **极小** | 几乎不可压——每个 curl/SQL 都是执行步骤 |
-| Review 台账 | 小 | 已关闭问题长描述可缩短；待处理问题不可删 |
-| 流程/架构设计文档 | 小–中 | 重复说明同一规则的「背景」段、「为什么这样设计」纯叙述 |
+| Anomaly | Disposition |
+|---------|-------------|
+| Skipped/duplicated chapter numbers, duplicate subsection titles, broken table rendering (blank lines splitting tables / misaligned headers) | Fix inside the single file; if renumbering changes other section numbers, grep whole-repo refs and sync before/while fixing |
+| Dangling § refs (point to missing subsections) | Re-anchor to the correct target; if no target, rewrite as self-contained prose |
+| Disordered subsections | Reorder + grep whole-repo refs (external docs may cite §N.N) and sync |
+| Table/class/path names that look wrong vs code | Verify against source (entity class / @TableName / directory layout / script entry): confirmed → fix now; unverifiable → mark `待核实` / pending verification and return in the report—**do not guess** |
+| Cross-doc duplication not yet converged | Converge now under “volatile facts, single source”: authority keeps the full fact; others reduce to one conclusion or pointer |
 
-对知识库说「无可压」是正常结论。对排障记录说「无可压」需要强理由。
+Execution tiers: single-file fixes that do not affect external refs → subagent fixes directly and records in the ledger; fixes that affect external refs or need cross-shard authority judgment → return to main agent to fix now—“high risk” means “main agent checks blast radius then fixes,” not “list it and skip.”
+
+The only allowed leave-unfixed item for the close-out report: content contradiction with no code evidence to decide (who is right is a product/design call) → ask the user. That is a safety boundary, not deferred repair.
 
 ---
 
-## 压缩标识批量脚本
+## Compression intensity by document type
 
-追加标识用脚本操作，不要逐文件手动处理：
+Compression headroom varies hugely by type; one scale for all audits misses a lot of redundancy:
+
+| Type | Typical headroom | Audit focus |
+|------|------------------|-------------|
+| Troubleshooting `troubleshooting/` | **Large (often 80%+)** | Diary narrative, duplicated verification steps, worthless appendices, “summary” that rehashes root cause, “reviewer / next review” metadata |
+| Ops incident docs `operations/` (`*incident*` / `*outage*` / `YYYY-MM-DD-*`) | **Large** (same scale as troubleshooting) | Same as troubleshooting; counts toward type-driven fold threshold; prefer pointer indexes; do not relocate by default |
+| Design proposals `design/` | Medium (10–30%) | Long “industry background” / “motivation” padding, full write-ups of abandoned options |
+| Runbooks / playbooks | **Tiny** | Almost incompressible—every curl/SQL is an execution step |
+| Review ledgers | Small | Long descriptions of closed issues may shorten; open issues must not be deleted |
+| Process / architecture design docs | Small–medium | Repeated “background” for the same rule; pure narrative “why we designed it this way” |
+
+Saying “nothing compressible” about a knowledge base is a normal conclusion. Saying “nothing compressible” about a troubleshooting record needs a strong reason.
+
+---
+
+## Batch compact-marker script
+
+Append markers with a script; do not hand-edit file by file:
 
 ```python
 import re, glob
 
-TAG = '<!-- 该文档整理/压缩于 2026-06-22 -->'  # 替换实际日期
+TAG = '<!-- 该文档整理/压缩于 2026-06-22 -->'  # replace with the real date
 pattern = re.compile(r'\n*<!-- 该文档整理/压缩于 \d{4}-\d{2}-\d{2} -->\n*')
 
 for fpath in glob.glob('docs/**/*.md', recursive=True):
@@ -133,66 +135,65 @@ for fpath in glob.glob('docs/**/*.md', recursive=True):
 
 ---
 
-## §2.5 路径存活性验证
+## §2.5 path liveness
 
-doc-compact 审计含 `§2.5 物理路径速查` 的 KB 时，**必须验证路径是否仍存在**：
+When doc-compact audits a KB that contains `§2.5` physical path quick-lookup, **paths must still exist**:
 
 ```bash
-# 对每个 KB 中 §2.5 的路径行，ls 确认目录存在
+# For each path row in §2.5 of every KB, ls to confirm the directory exists
 grep -E '^\|' docs/*_KNOWLEDGE_BASE.md | grep '§2.5' -A 999 | grep -E '^\| [^-|]' | awk -F'|' '{print $2}' | xargs -I{} sh -c 'test -d "{}" || echo "STALE: {}"'
 ```
 
-- `STALE` 路径：标记为死路径，确认代码已迁移/删除后从 §2.5 移除
-- 路径存在但内容已空/清空：对照代码确认该模块是否已迁移，当场更新路径或移除该行；当场核不了的标 `待核实` 并在报告中说明原因
-- 验证结果纳入 Step 6 审计报告
+- `STALE` paths: mark as dead; after confirming code moved/deleted, remove from §2.5
+- Path exists but content is empty/cleared: confirm against code whether the module moved; update the path or remove the row on the spot; if you cannot verify now, mark `待核实` / pending verification and explain in the report
+- Include results in the Step 6 audit report
 
-**不要跳过验证**：§2.5 受保护不等于它的内容永远正确。保护的是结构（不删整个 §2.5），不是保护其中可能过时的具体路径行。
-
----
-
-## 行号替换操作指引
-
-遇到文档中的行号引用（如"第 535 行"、"Line 42"、"行 N"）时：
-
-1. 从引用上下文确定目标文件路径
-2. `Read` 该文件对应行号，确认当前该行所在的方法名/类名
-3. 用 `类名.方法名()` 格式替换原行号引用
-4. **不可凭猜测替换**：如果目标文件已被删除或行号超出文件范围，改为 `[已失效，原引用第 N 行]` 并标记为待清理
+**Do not skip verification:** §2.5 being protected does not mean its contents stay forever correct. Protection covers structure (do not delete the whole §2.5), not every possibly stale concrete path row.
 
 ---
 
-## 压缩天花板与漂移防护
+## Line-number replacement guide
 
-### 什么时候该停
+When a doc cites line numbers (e.g. “line 535,” “Line 42,” “行 N”):
 
-不是所有文档都能无限压。到达以下信号时停止压缩：
+1. From citation context, determine the target file path
+2. `Read` that line and confirm the current method/class name
+3. Replace the line-number citation with `ClassName.method()` form
+4. **Do not guess replacements:** if the target file is gone or the line is out of range, change to `[stale; originally line N]` and mark for cleanup
 
-- **已到 Agent 最小可用信息量**：删任何一行都会导致 Agent 在某个任务场景下需要额外搜索代码才能行动
-- **结构化内容占比 > 80%**：表格、代码块、索引条目为主的文档，几乎无叙述可压
-- **文档已标注过压缩标识**：上次压缩距今 < 30 天且无代码变动 → 跳过该文档，在报告中标"近期已压"
-- **操作手册/Playbook**：每行都是步骤 → 几乎不可压（见上方"按文档类型分配压缩力度"）
+---
 
-### 多次压缩的漂移风险
+## Compression ceiling and drift protection
 
-每次压缩都是有损操作。连续两次以上压缩同一文档时，检查：
+### When to stop
 
-1. **精确标识符是否被泛化**：`XxxService.handlePayment()` 是否变成了"支付处理逻辑"
-2. **数字/阈值是否被抹除**：`超时 30s` 是否变成了"会超时"
-3. **因果链是否断裂**：`因为 A 所以必须 B` 是否只剩 `必须 B`（丢了 why = 下次改代码不知道能否移除 B）
-4. **验证命令是否还能执行**：压缩前有 `curl ...` 实际命令，压缩后是否变成了"调接口验证"
+Not every doc can be compressed forever. Stop when you see:
 
-发现漂移 → 回到代码源头恢复精确信息，不要在压缩后的摘要上继续压缩。
+- **Already at the minimum agent-usable information:** deleting any more line forces the agent to search code before it can act in some task scenario
+- **Structured content > 80%:** tables, code blocks, and index entries dominate—almost no narrative left to compress
+- **Already marked as compressed:** last compact < 30 days ago and no code change → skip; report “recently compressed”
+- **Runbooks/playbooks:** every line is a step → almost incompressible (see “Compression intensity by document type” above)
 
-### subagent 并行压缩的漂移防护
+### Drift risk across multiple compressions
 
-SKILL.md Step 5 把逐篇压缩分发给多个 subagent 并行执行。这放大了上述漂移风险：单 agent 串行压多次是**同一判据理解在不同时间漂移**，多 subagent 并行是**不同判据理解在同一时间发散**——后者更隐蔽，因为各 subagent 独立返回看似合理的账目，主 agent 若不交叉比对就发现不了跨片不一致。
+Every compression is lossy. On the second+ pass of the same doc, check:
 
-主 agent 汇总各 subagent 账目时，除逐条核对上述四项漂移外，必须额外做**跨片一致性回检**：
+1. **Precise identifiers generalized:** did `XxxService.handlePayment()` become “payment handling logic”?
+2. **Numbers/thresholds erased:** did `timeout 30s` become “may time out”?
+3. **Causal chain broken:** did `because A, must B` become only `must B` (losing why = next code change cannot tell whether B can be removed)?
+4. **Verification commands still runnable:** did a real `curl ...` become “call the API to verify”?
 
-1. **同领域多 subagent 的判据一致性**：同一领域拆成多个 subagent 时（如消费域 12 篇拆 2 个 subagent），检查两个 subagent 对「同一类冗余」是否给了相同处置——A subagent 把「历史沿革」全删，B subagent 保留为脚注，就是判据发散。发现发散 → 主 agent 统一裁定，回传让偏离方对齐。
-2. **跨片重复事实的去重落点**：同一数字/边界/例外可能散落在分给不同 subagent 的文档里（如某阈值既在 A subagent 压的设计文档里、又在 B subagent 压的 KB 里）。各 subagent 只看自己那片，无法判定谁是权威源。主 agent 汇总时必须**跨片扫同一易变事实**：grep 各 subagent 压后产物里是否还残留同一数字，确认只剩权威源一处、其余已提炼为不变结论。这是「易变事实单一来源」原则在并行场景的硬性回检——单 agent 串行时靠记忆跨篇去重，并行时只能靠主 agent 事后 grep 兜底。
-3. **受保护段是否被误压**：各 subagent 注入了受保护段清单，但执行时可能因上下文挤压把 `§2.5 物理路径速查` 某行、`§0 目录索引` 某条、方法名锚定误删。主 agent 汇总后跑一遍 `grep -c` 核对：每个 KB 的 `§2.5` / `§0` / `§1.5` 锚点行数应与压缩前一致（受保护段不可删行，只能改其中的 STALE 路径）。少了就是误压，回滚该段。
-4. **压缩标识是否齐全**：各 subagent 压完应自行追加 `<!-- 该文档整理/压缩于 YYYY-MM-DD -->`，但并行场景容易漏。主 agent 汇总后跑 Step 6 的 `audit.py --compact-date` 硬闸门兜底——`压缩缺标识=0` 是并行场景的最后一道防线，任何缺标识 = 该 subagent 漏标，补完才算闭环。
+If drift is found → restore precise information from the code source; do not keep compressing summaries of summaries.
 
-**回检发现漂移的处置**：单篇漂移 → 回滚该篇至压缩前（git checkout）重新压；跨片判据发散 → 主 agent 出统一裁定规则，回传所有偏离方重压受影响段落。**禁止**在压缩后产物上打补丁——补丁会让该篇与判据基线脱钩，下次 doc-compact 更难审。
+### Drift protection for parallel subagent compression
 
+SKILL.md Step 5 dispatches per-doc compression to multiple subagents in parallel. That amplifies the drift risks above: serial single-agent re-compression is **the same criteria understanding drifting over time**; parallel multi-subagent compression is **different criteria understandings diverging at the same time**—harder to spot, because each subagent returns a locally plausible ledger and the main agent will miss cross-shard inconsistency without cross-checking.
+
+When the main agent merges subagent ledgers, beyond the four drift checks above, it must also run a **cross-shard consistency pass**:
+
+1. **Same-domain criteria consistency across subagents:** when one domain is split across subagents (e.g. billing domain, 12 docs → 2 subagents), check both treated “the same class of redundancy” the same way—A deleted all “historical narrative,” B kept it as footnotes = criteria divergence. On divergence → main agent unifies the ruling and sends back for alignment.
+2. **Dedup landing for facts repeated across shards:** the same number/boundary/exception may sit in docs assigned to different subagents (e.g. a threshold in a design doc under A and a KB under B). Each subagent only sees its shard and cannot pick the authority. On merge, the main agent must **cross-shard scan the same volatile fact**: grep each subagent’s post-compress output for the same number; confirm only the authority remains and others were distilled to stable conclusions. This is the hard parallel-case check of “volatile facts, single source”—serial agents rely on memory across docs; parallel runs need post-hoc main-agent grep.
+3. **Protected sections not mishandled:** subagents received the protected list, but under context pressure may still delete a `§2.5` row, a `§0` TOC entry, a method-name anchor, or a 🔒 managed block. After merge, run `grep -c` checks: each KB’s `§2.5` / `§0` / `§1.5` anchor line counts should match pre-compress (protected sections may not drop rows—only STALE paths inside may change); AGENTS.md managed-block marker pairs must still exist. Fewer lines = mishandling → roll that section back.
+4. **Compact markers complete:** each subagent should append `<!-- 该文档整理/压缩于 YYYY-MM-DD -->`, but parallel runs often miss. After merge, run Step 6’s `audit.py --compact-date` hard gate—`压缩缺标识=0` / missing-marker = 0 is the last parallel defense; any miss = that subagent forgot markers; close only after fixing. If most docs were skipped as “recently compressed,” the real gate is “today’s markers ∪ last-30-day markers = full set.”
+
+**Disposition when post-check finds drift:** single-doc drift → roll that doc back to pre-compress (`git checkout`) and re-compress; cross-shard criteria divergence → main agent issues a unified ruling and sends all divergent parties to re-compress affected passages. **Do not** patch on top of compressed output—patches decouple that doc from the criteria baseline and make the next doc-compact harder to audit.

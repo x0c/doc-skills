@@ -1,152 +1,154 @@
 ---
 name: doc-update
-description: 会话复盘：将可复用的发现更新到 skill 或项目 docs，同步代码变动导致的文档失效。Use at end of session to persist reusable findings to docs.
+description: Session retrospective — persist reusable findings into skills or project docs, and sync docs that code changes invalidated. Use at end of session to persist reusable findings to docs.
 ---
 
-## 核心目标
+**Document language:** When writing or updating project docs, follow the project's existing documentation language and the user's language; if unclear, default to English. Do not invent a conflicting language policy beyond global AGENTS.
 
-下次换一个全新 Agent 进来，只读现有文档就能顺畅理解上下文、接手并完成工作。
+## Core goal
 
-每步更新都以此为检验标准：*如果现在换一个 Agent，它不看本次会话、只读这些文档，能顺利干活吗？*
+The next time a brand-new Agent joins, it should understand context, take over, and finish the work by reading existing docs alone.
 
-## 与 memory 的边界
+Use this as the acceptance test for every update: *If we swap in a new Agent now, and it never sees this session—only these docs—can it work smoothly?*
 
-- 本 skill 只更新对应 skill 文件或当前项目文档，不读取或写入任何 memory。
-- 项目规则禁用 memory 时，本 skill 仍可正常执行；禁止把"禁用 memory"误判为"禁用复盘与文档更新"。
+## Boundary with memory
 
-## Step 0：判定是否需要执行
+- This skill only updates the relevant skill file(s) or the current project's docs; it does not read or write any memory.
+- When project rules disable memory, this skill still runs normally; do not misread "memory disabled" as "retrospective and doc updates disabled."
 
-跳过条件（任一命中则直接告知用户"本次无需更新"并结束）：
+## Step 0: Decide whether to run
 
-- 纯问答/闲聊，无代码、配置、流程、规则变动
-- 所有发现已存在于现有文档（先搜再判断）
-- 信息仅对当前会话有用，未来会话不会重现
-- 项目规则明确禁止修改 skill / docs
+Skip conditions (if any match, tell the user "No updates needed this time" and stop):
 
-## Step 1：回顾会话，提取可复用发现
+- Pure Q&A / chat with no code, config, process, or rule changes
+- All findings already exist in current docs (search first, then decide)
+- Information is useful only for this session and will not recur
+- Project rules explicitly forbid modifying skills / docs
 
-**召回（先扫全）**：把本次会话当作即将被永久删除——任何没落进文档的信息都会随之消失。带着这个前提扫一遍会话，重点回放两类不留 artifact 的信息源（代码变动会留在 diff 里，它们只在对话上下文里，最容易漏召回）：
+## Step 1: Review the session and extract reusable findings
 
-- **逐条回放用户的每一次插话**（纠正、要求、否决、建议；对照下方「用户纠正信号细化检查」清单逐条比对，防漏）。
-- **逐段回放自己的试错弯路**：反复尝试多轮才走通、中途被否决 / 失败的方案。最终产出只体现正确答案，看不出中间排除过什么；记录时必须带"哪些路走不通 + 根因 + 最终解法"，不只记现象或只记结论。
+**Recall (scan everything first):** Treat this session as about to be permanently deleted—anything not written into docs disappears with it. With that premise, scan the session, focusing on two artifact-free sources (code changes leave a diff; these live only in conversation context and are easiest to miss):
 
-**提炼（主动归纳，禁止甩给用户）**：在召回之后，主动判断：本会话是否沉淀出可复用的工作方式、检查清单、排障路径、命名/落盘约定、验证口径？若有，直接写成可执行条目并进入后续落盘步骤。
+- **Replay every user interjection one by one** (corrections, requirements, vetoes, suggestions; match against the 「User correction signal checklist」 below item by item to avoid misses).
+- **Replay your own trial-and-error detours section by section:** paths that took multiple rounds to succeed, or mid-course vetoed / failed approaches. The final artifact only shows the right answer, not what was ruled out; when recording, you must include "which paths failed + root cause + final fix," not just the symptom or just the conclusion.
 
-- **禁止**对用户说「能不能从会话总结一套最佳实践」「要不要沉淀一下经验」之类征求意见的话——是否值得落盘由本 skill 自行判定，用户只需在 Step 4 看到更新结果或「本次无需更新」。
-- **禁止**把一次性操作流水账包装成「最佳实践」；只落盘未来会话仍会用到的稳定约定。
-- 写成条目时用祈使句 / 检查清单口吻（做什么、何时做、禁止什么），不要写成会话纪要。
+**Distill (actively synthesize; do not dump this on the user):** After recall, actively judge: did this session produce a reusable working method, checklist, troubleshooting path, naming/placement convention, or verification bar? If yes, write it as executable items and proceed to the write-down steps.
 
-**判据（再筛准）**：核心问题——*换一个全新 Agent 只读文档，它能顺畅接手吗？* 让它少踩坑、少重新摸索的 → 记；能从代码 / git / 现有文档直接拿到的 → 不记。下列是这条判据的常见命中：
+- **Do not** ask the user things like "should we distill best practices from this session?" or "want to capture the lessons?"—whether it is worth writing down is decided by this skill; the user only needs to see the update result or "No updates needed this time" in Step 4.
+- **Do not** dress one-off operational play-by-play as "best practices"; only persist stable conventions future sessions will still use.
+- Write items in imperative / checklist voice (what to do, when, what is forbidden), not as a session diary.
 
-- 新发现的业务规则、设计机制、架构约束
-- 踩过的坑（含根因和解法）
-- **验证有效的模式、工作流、检查清单**（含本会话归纳出的稳定做法）——用「非显然元素测试」判定：模式里是否含"下次换新 Agent 能省摸索"的非显然元素（关键决策、绕坑动作、顺序选择、验证口径）？只有显然步骤的漂亮流水账 → 不记
-- 用户给出的偏好/反馈/纠正——**判别一次性 vs 长期**：话里含「以后 / 每次 / 都 / 不要再」，或是对你已做出动作的纠正 / 否决 / 返工要求 → 默认按长期偏好落盘；纯描述本次任务范围的（如「这次只改 X」）才算仅对当前会话有用
-- **用户纠正信号细化检查**（对照清单逐条扫会话，防漏召回——笼统的「用户纠正」最容易漏掉以下几种）：
-  - **重定向**：用户把方案 / 话题引向另一方向（不等于批评，单独成信号）
-  - **不满 / 困惑 / 摩擦**：用户没说「你错了」，但表达困惑、含糊不满、或绕晕
-  - **重复请求 / 二次追问**：用户被迫再问一遍相同的事——最强的「上次没沉淀好」信号，必记
-  - **更优默认值**：用户期望暗示 agent 本应有更好的默认行为（隐含期待）
-  - **只处理表面**：需求被表面满足、真实意图没被挖到
-  - **有现成资源没用**：有文档 / 方法 / 工具可查，但 agent 直接上手导致返工
-  - **低效路径**：明显弯路、重复尝试、参数 / 步骤不优
-- 代码变动导致的文档失效点
-- **本会话曾因索引描述没覆盖任务而找不到 / 找错文档（路由失败）**——记下你当时带着什么动作来找（查看 / 优化 / 排查 / 新建 / 改配置…），Step 3c 据此补进索引描述
+**Criteria (then filter precisely):** The core question—*Can a brand-new Agent take over smoothly by reading docs alone?* Anything that saves it from pitfalls or re-discovery → record; anything it can get directly from code / git / existing docs → skip. Common hits of this criterion:
 
-**不记录**：
+- Newly discovered business rules, design mechanisms, architecture constraints
+- Pitfalls hit (including root cause and fix)
+- **Validated patterns, workflows, checklists** (including stable practices distilled in this session)—apply the "non-obvious element test": does the pattern contain non-obvious elements that would save a new Agent next time (key decisions, pitfall workarounds, ordering choices, verification bars)? A pretty play-by-play of only obvious steps → skip
+- User preferences / feedback / corrections—**distinguish one-off vs long-term**: if the wording includes "from now on / every time / always / don't again," or it corrects / vetoes / demands rework of something you already did → default to long-term preference and write it down; only pure scope descriptions of this task (e.g. "this time only change X") count as session-only
+- **User correction signal checklist** (scan the session against this list item by item to avoid missed recall—generic "user correction" most often misses these):
+  - **Redirect:** user steers the plan / topic another way (not the same as criticism; treat as its own signal)
+  - **Dissatisfaction / confusion / friction:** user never said "you're wrong," but expressed confusion, vague dissatisfaction, or got tangled
+  - **Repeated request / follow-up:** user had to ask the same thing again—the strongest "last time wasn't persisted well" signal; must record
+  - **Better default:** user implied the agent should already have had a better default behavior (implicit expectation)
+  - **Surface-only handling:** the request was met on the surface, but the real intent wasn't dug out
+  - **Existing resource unused:** docs / methods / tools were available, but the agent jumped in bare-handed and caused rework
+  - **Inefficient path:** clear detours, repeated attempts, suboptimal parameters / steps
+- Doc invalidation points caused by code changes
+- **This session failed to find / found the wrong doc because the index description didn't cover the task (routing failure)**—record what action you were carrying when you searched (view / optimize / troubleshoot / create / change config…); Step 3c uses this to patch the index description
 
-- 代码本身能表达的信息（函数签名、类结构、import 关系）
-- git log/blame 能查到的信息（谁改了什么、何时合并）
-- 临时调试过程（断点位置、临时日志）
-- 无进展的失败循环（反复尝试同一种环境 / 工具错误、任务无推进）——只有**任务层面**的方案失败（走不通的路 + 根因 + 最终解法）才值得记
-- 已在 AGENTS.md 中记录的规则
+**Do not record:**
 
-## Step 2：按决策树分类
+- Information the code itself expresses (function signatures, class structure, import relationships)
+- Information git log/blame can provide (who changed what, when it merged)
+- Temporary debugging process (breakpoint locations, temporary logs)
+- Failure loops with no progress (repeatedly hitting the same environment / tool error with no task advancement)—only **task-level** approach failures (dead ends + root cause + final fix) are worth recording
+- Rules already recorded in AGENTS.md
 
-| 信息类型 | 目标位置 | 示例 |
-|---------|----------|------|
-| 跨项目通用模式/脚本/检查清单 | 对应 skill 的文件 | 迁移检查清单、通用审查脚本 |
-| **项目级行为规范/约束/强制要求** | **项目根 `AGENTS.md`** | 验证流程要求、收工检查清单、启动命令、curl 判断标准 |
-| 项目业务规则/架构/领域知识 | 项目 `docs/` 下对应子目录 | 支付回调规则、分账逻辑 |
-| 用户偏好/反馈/纠正（项目范围） | 项目 `AGENTS.md` 或 `docs/` | 工作流约定、审查规范 |
-| 项目进度/里程碑 | 项目 `docs/` 下对应子目录 | 模块迁移完成记录 |
-| 代码变动 → 已有文档失效 | 同步更新对应 docs/ 文件 | 改了回调路由 → 更新回调文档 |
+## Step 2: Classify by decision tree
 
-**何时写 AGENTS.md vs docs/：**
+| Information type | Target location | Examples |
+|------------------|-----------------|----------|
+| Cross-project reusable patterns / scripts / checklists | Corresponding skill files | Migration checklist, generic review scripts |
+| **Project-level behavior norms / constraints / mandatory requirements** | **Project root `AGENTS.md`** | Verification process requirements, wrap-up checklists, startup commands, curl judgment criteria |
+| Project business rules / architecture / domain knowledge | Matching subdirectory under project `docs/` | Payment callback rules, split-settlement logic |
+| User preferences / feedback / corrections (project scope) | Project `AGENTS.md` or `docs/` | Workflow conventions, review norms |
+| Project progress / milestones | Matching subdirectory under project `docs/` | Module migration completion records |
+| Code change → existing docs invalidated | Sync-update the corresponding docs/ file | Changed callback route → update callback docs |
 
-- **AGENTS.md**：每次会话都需要遵守的规则、约束、操作规范（AI 行为指令）
-- **docs/**：参考性知识、历史记录、模块细节（人读的文档）
+**When to write AGENTS.md vs docs/:**
 
-## Step 3：执行更新
+- **AGENTS.md:** Rules, constraints, and operating norms every session must follow (AI behavior instructions)
+- **docs/:** Reference knowledge, historical records, module details (human-readable docs)
 
-### 3a. 更新 skill（仅跨项目通用信息）
+## Step 3: Perform the update
 
-- **禁止**写入项目特有的类名、表名、配置路径、业务规则
-- 如果有可脚本化的重复工作 → 在 skill 的 `scripts/` 目录创建脚本，并在 skill 文档中引用说明用途
-- 更新 skill 文档时保持现有结构，增量补充
+### 3a. Update a skill (cross-project reusable information only)
 
-### 3b. 更新项目文档 / AGENTS.md
+- **Do not** write project-specific class names, table names, config paths, or business rules
+- If there is repeatable work that can be scripted → create a script under the skill's `scripts/` directory, and reference it in the skill docs explaining its purpose
+- When updating skill docs, keep the existing structure and add incrementally
 
-1. **先读 `AGENTS.md`**：确认文档语言、索引、目录、命名和模块级覆盖规则。
-2. **是否属于 AI 行为规范**（强制流程、收工要求、操作约束）→ 写入 `AGENTS.md` 对应章节。
-3. **先按项目文档类型归类**，再决定目标文件：
-   - 项目规范 / agent 指令 → `<项目根>/AGENTS.md`
-   - 模块规范（按需，仅模块有独立约定时）→ `<module>/AGENTS.md`
-   - 任务域二级索引（按需，仅大项目触发时建）→ `docs/<domain>/<DOMAIN>_INDEX.md`；判定触发条件见 `$doc-compact`；根 `AGENTS.md` 是唯一一级入口，**禁止裸 `INDEX.md`/`OVERVIEW.md` 与根竞争**
-   - 领域知识库 → `docs/<DOMAIN>_KNOWLEDGE_BASE.md`
-   - 操作指南 / 使用手册 → `docs/<TOPIC>_GUIDE.md`
-   - 设计方案、重构方案 → `docs/design/<TOPIC>_DESIGN.md` 或 `docs/design/<kebab-case>.md`
-   - 故障排查记录 → `docs/troubleshooting/YYYY-MM-DD-<kebab-case>.md`
-   - 草稿 / 临时分析 → 不入库，使用 `DRAFT_*.md` 或 `*-draft.md`
-4. 已有对应文档 → 增量更新，补充新发现。**同步检查**：若代码变动涉及目录结构变化（新增/迁移包）→ 更新 KB 中 `§2.5 物理路径速查`；若新增重要类（Service/Component/Builder/Handler）→ 检查 §2.5 文件数/代表类名；若类或方法重命名 → grep KB 中旧方法名锚定引用并替换（方法名锚定形如 `ClassName.method()`）；若代码/目录被**删除** → 从 §2.5 移除已不存在的路径行、从 §3/§5 移除对应入口。
-5. 无对应文档 → 按分类、路径和命名规则新建，并在**根 `AGENTS.md` 的「文档导航」加一条**（一行、带「何时该读」的一句话用途）；该文档支撑某条具体规则时，在那条规则旁就近补一个 inline 指针。如果是以前从未出现过的新文档类型，同步更新根 `AGENTS.md` 的文档类型说明。
-   - **预置折叠类型的特殊处理**：新建的是故障排查或 Review 台账文档时，先数该类现有文档总数——不足 3 篇则在根里直链（正常流程）；达到 3 篇则改为折叠：建对应 `<DOMAIN>_INDEX.md`（若不存在）、把根里的同类平铺条目全部替换为一条强路由（含「何时跳过 / 是否权威源」）、新文档条目落进 `<DOMAIN>_INDEX.md`。强路由范例见全局规范「两级索引」节。
-6. 删除、迁移或重命名文档 → 搜索全仓引用，同步更新根 `AGENTS.md` 文档导航与相对链接。
-7. **禁止**在项目根、源码目录或随机位置随意创建文档，一律按第 3 步的类型归位。
-8. 若发现项目文档已大面积失序（索引失效、`AGENTS.md` 膨胀、CLAUDE.md 被污染、残留 `OVERVIEW.md`/`INDEX.md`），不要在复盘里顺手大改，转用 `$doc-compact` 做整体重整。
+### 3b. Update project docs / AGENTS.md
 
-### 3c. 文档索引校对与修复（增量，仅本次触及 / 暴露的条目）
+1. **Read `AGENTS.md` first:** confirm documentation language, index, directories, naming, and module-level coverage rules.
+2. **Is it AI behavior guidance** (mandatory process, wrap-up requirements, operating constraints) → write into the matching section of `AGENTS.md`.
+3. **Classify by project doc type first**, then choose the target file:
+   - Project norms / agent instructions → `<project-root>/AGENTS.md`
+   - Module norms (as needed, only when a module has independent conventions) → `<module>/AGENTS.md`
+   - Task-domain secondary index (as needed, only when a large project triggers it) → `docs/<domain>/<DOMAIN>_INDEX.md`; trigger conditions are in `$doc-compact`; root `AGENTS.md` is the only primary entry—**do not create bare `INDEX.md`/`OVERVIEW.md` that compete with the root**
+   - Domain knowledge base → `docs/<DOMAIN>_KNOWLEDGE_BASE.md`
+   - How-to / operations guide → `docs/<TOPIC>_GUIDE.md`
+   - Design / refactor proposals → `docs/design/<TOPIC>_DESIGN.md` or `docs/design/<kebab-case>.md`
+   - Troubleshooting records → `docs/troubleshooting/YYYY-MM-DD-<kebab-case>.md`
+   - Drafts / temporary analysis → do not check into the repo; use `DRAFT_*.md` or `*-draft.md`
+4. Matching doc already exists → update incrementally with new findings. **Sync checks:** if code changes involve directory structure (new/migrated packages) → update `§2.5 Physical path quick reference` in the KB; if important classes were added (Service/Component/Builder/Handler) → check §2.5 file counts / representative class names; if classes or methods were renamed → grep the KB for old method-name anchors and replace (method-name anchors look like `ClassName.method()`); if code/directories were **deleted** → remove nonexistent path rows from §2.5 and remove corresponding entries from §3/§5.
+5. No matching doc → create one per classification, path, and naming rules, and **add one entry to root `AGENTS.md` 「文档导航」** (one line, with a one-sentence "when to read" purpose); when the doc supports a specific rule, add a nearby inline pointer next to that rule. If this is a previously unseen document type, also update the document-type explanation in root `AGENTS.md`.
+   - **Special handling for preset foldable types:** when creating a troubleshooting or Review ledger doc, first count how many docs of that type already exist—under 3, link them directly from the root (normal flow); at 3, fold: create the matching `<DOMAIN>_INDEX.md` (if missing), replace all same-type flat root entries with one strong route (including "when to skip / whether this is the authority"), and put the new doc entry into `<DOMAIN>_INDEX.md`. Strong-route examples are in the global norm 「两级索引」 section.
+6. Delete, migrate, or rename a doc → search whole-repo references; sync-update root `AGENTS.md` document navigation and relative links.
+7. **Do not** create docs arbitrarily at the project root, in source directories, or in random places—always place them by the type rules in step 3.
+8. If project docs are already widely disordered (broken index, bloated `AGENTS.md`, polluted CLAUDE.md, leftover `OVERVIEW.md`/`INDEX.md`), do not casually overhaul during retrospective—hand off to `$doc-compact` for a full restructure.
 
-**何时做**：满足以下任一条件：
+### 3c. Document index review and repair (incremental; only entries touched / exposed this time)
 
-- 本次复盘新增 / 迁移 / 重命名了文档
-- 本会话曾因索引路由失败而找不到 / 找错文档（Step 1 最后一条信号命中）
-- **向现有文档追加了新章节或新领域内容**（即使没有新建文档，只要文档覆盖的任务范围变宽了，索引描述就必须同步更新）
+**When to do this:** any of the following:
 
-**范围只限本次触及或本次暴露问题的条目**；若发现根 `AGENTS.md` 索引大面积失序，转 `$doc-compact`（见 Step 3b 第 8 条），别在复盘里顺手大改。
+- This retrospective added / migrated / renamed docs
+- This session failed to find / found the wrong doc due to index routing failure (Step 1 last signal hit)
+- **New sections or new domain content were appended to an existing doc** (even without creating a new doc, if the task scope the doc covers widened, the index description must be updated in sync)
 
-对每个涉及的文档，逐项校对根 `AGENTS.md`「文档导航」里它的条目：
+**Scope is limited to entries touched this time or whose problems were exposed this time**; if root `AGENTS.md` indexing is widely disordered, hand off to `$doc-compact` (see Step 3b item 8)—do not casually overhaul during retrospective.
 
-1. **存在且唯一**：该文档**有且仅有一条**导航条目；迁移 / 重命名后旧链接已全仓搜索同步、无死链。（死链 / 孤儿 / 唯一性这类机械项可借 `$doc-compact` 的 `scripts/audit.py` 跑一遍。）
-2. **描述覆盖任务（关键，最易漏）**：条目描述必须是「何时该读」句式，且**覆盖本会话实际带着的任务触发词**，以及该领域天然可能出现的全部任务类型（修改/新建/评审/分析/排查/优化）。自测两句——
-   - *回想这次我带着什么动作来找它（查看 / 优化 / 排查 / 评审 / 分析 / 新建 / 改某配置…），描述里有没有那个触发场景？*
-   - *这次往文档里新加的章节或领域，索引描述有没有覆盖？*（向已有文档追加内容是最容易漏更新索引描述的场景）
+For each involved doc, review its entry in root `AGENTS.md` 「文档导航」 item by item:
 
-   本会话只要发生过路由失败 **或** 文档内容被扩展，就要检查并补全：**把缺的触发键补进描述（只增量加，不删原有触发场景）**。
-3. **inline 指针**：文档支撑某条具体规则 / 不变量时，那条规则旁有就近 inline 指针（底部导航表只作兜底）。
+1. **Exists and unique:** the doc has **exactly one** navigation entry; after migrate / rename, old links were searched and synced repo-wide with no dead links. (Mechanical checks like dead links / orphans / uniqueness can run via `$doc-compact`'s `scripts/audit.py`.)
+2. **Description covers the task (critical, easiest to miss):** the entry description must use the "when to read" sentence form, and **cover the task trigger words actually carried in this session**, plus all task types naturally possible in that domain (modify / create / review / analyze / troubleshoot / optimize). Self-test with two questions—
+   - *Recall what action I was carrying when I looked for it (view / optimize / troubleshoot / review / analyze / create / change a config…)—does the description include that trigger scenario?*
+   - *Did I add new sections or domains to the doc this time—does the index description cover them?* (Appending to an existing doc is the scenario where index-description updates are most often missed)
 
-**反模式**（命中即改）：
+   Whenever this session had a routing failure **or** the doc content was expanded, check and complete: **add the missing trigger keys into the description (incremental add only; do not delete existing trigger scenarios)**.
+3. **Inline pointers:** when a doc supports a specific rule / invariant, that rule has a nearby inline pointer (the bottom navigation table is only a fallback).
 
-- 描述写成「它讲了什么」（罗列文档内容）而非「带着什么任务该读它」——只列内容的描述路由不了。
-- 一个故障 / 单一框架的描述（如只写「排查 X 故障」），却要承接同一文档的其他任务（如「优化 / 查看 X 配置」）——补全任务维度，别只留排查框架。
+**Anti-patterns** (hit → fix):
 
-### 3d. 修正与本次真相冲突的旧文档（有界）
+- Description written as "what it talks about" (listing doc content) rather than "with what task you should read it"—content-only descriptions cannot route.
+- A failure / single-framework description (e.g. only "troubleshoot X failures") that must also serve other tasks for the same doc (e.g. "optimize / view X config")—complete the task dimensions; don't leave only the troubleshooting frame.
 
-**何时做**：本会话确立或纠正了某个逻辑或名词（用户纠正、多方确认后定下的结论），且现有文档里有跟它矛盾的旧结论 / 旧叫法。**范围只限本会话实际碰过的概念 / 领域**，不全量普查所有文档找矛盾——那是 `$doc-compact` 的整体体检，不塞进收工复盘。
+### 3d. Correct old docs that conflict with this session's truth (bounded)
 
-按全局规范「§5 单一来源」就地改对，不允许把矛盾留成两份文档各执一词：
+**When to do this:** this session established or corrected a piece of logic or terminology (user correction, multi-party confirmed conclusion), and existing docs contain contradictory old conclusions / old names. **Scope is limited to concepts / domains this session actually touched**—do not census every doc for contradictions; that is `$doc-compact`'s full health check, not part of wrap-up retrospective.
 
-- **裁定**：默认回权威源（产品 / 需求文档、代码）核实再定；用户看过源头后明确推翻源头、坚持按最新认知来的，经确认以用户为准，并在对应文档写一条带日期和理由的【裁定】记录防止下次翻案（格式见 `$doc-init` 的 `references/document-templates.md` §6）。
-- **传播**：裁定后自动改齐、不二次确认。改名（主称谓）在本会话涉及的文档里全量替换、保留实现别名；改逻辑含删 / 大改文档也自动执行，事后在 Step 4 摘要里详列改了 / 删了什么。
+Fix in place per global norm 「§5 单一来源」; do not leave contradictions as two docs each claiming truth:
 
-## Step 4：输出摘要
+- **Ruling:** default to verifying against the authority (product / requirements docs, code) before deciding; if the user reviewed the source, explicitly overturned it, and insists on the latest understanding, after confirmation the user wins—and write a dated 【裁定】 record with rationale in the corresponding doc to prevent later overturns (format in `$doc-init`'s `references/document-templates.md` §6).
+- **Propagation:** after a ruling, sync all changes automatically without a second confirmation. Renames (primary term) are fully replaced in docs this session touched, keeping implementation aliases; logic changes including delete / major doc rewrites also run automatically, then list what was changed / deleted in detail in the Step 4 summary.
 
-**收工自测**：想象一个全新 Agent 现在进来，不看本次会话、只读更新后的文档——它能顺畅接手吗？能 → 输出摘要结束；不能 → 先补完缺失信息，再报完成。
+## Step 4: Output summary
 
-用一句话告知用户更新了什么、在哪里。格式：
+**Wrap-up self-test:** imagine a brand-new Agent joining now, never seeing this session, only reading the updated docs—can it take over smoothly? Yes → output the summary and stop; No → fill the missing information first, then report done.
+
+Tell the user in one sentence what was updated and where. Format:
 
 ```
-已更新：[目标文件路径] — [一句话说明变更内容]
+Updated: [target file path] — [one-sentence description of the change]
 ```
 
-若本会话归纳了可复用做法，摘要里写清「落成了什么约定 / 检查清单」，不要写成「总结了最佳实践」这类空话。
+If this session distilled reusable practices, the summary must say clearly "what convention / checklist was written down," not empty phrases like "summarized best practices."

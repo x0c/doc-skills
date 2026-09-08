@@ -1,26 +1,28 @@
-# doc-compact 判定基准：文档管理模式（完整说明）
+# doc-compact judgment baseline: document management model (full explanation)
 
-本文件是 `SKILL.md` §0 那张精简 checklist 的展开说明，供审计/压缩判断拿不准时按需读取。
+This file expands the compact checklist used by `SKILL.md` for audit/compression when a judgment call is unclear.
 
-**定位**：这是 doc-compact 自己审计/压缩时的检查清单，覆盖范围比全局指令文件实际安装的标准文本更细（含二级索引数值门槛、易变事实处理细则等 doc-compact 专用操作性细则）。**它不是"待插入全局文件的内容"**——全局指令文件里真正应安装/比对的权威文本，唯一来源是 doc-init 的 `<DOC_INIT_DIR>/scripts/insert_doc_governance.py`。两者条款应保持兼容；若发现本文比该脚本的 STANDARD 多出本该全局生效的规则，应提给 doc-init 维护者合并进 STANDARD 并升版本号，而不是在 doc-compact 这里自行写入全局文件。
+**Role:** This is **doc-compact’s own compact audit checklist**—finer-grained than the text actually installed into global instruction files (it includes secondary-index numeric thresholds, volatile-fact handling, and other doc-compact-only operational detail). **It is not the injectable STANDARD** and must not be treated as “content to paste into global files.”
 
-**心智模型**：文档结构二维——**纵向三层**（规则层 `AGENTS.md` 常驻 → 索引层 `<DOMAIN>_INDEX.md` 按任务按需 → 内容层具体文档按需读取）+ **横向类型**（开放集合，常见五类作默认，可新增并登记）。审计时不得因类型不在常见五类内就判违规，只校验「是否已在文档类型表登记 + 是否归位到正确路径」。
+**Injectable authority:** the only source of text that should be installed into / compared against global AI instruction files is doc-init’s `<DOC_INIT_DIR>/scripts/insert_doc_governance.py`. For skill-boundary and what must never be injected into those managed blocks, also see global `docs/SKILLS_GUIDE.md`. Keep this checklist compatible with that script’s STANDARD; if this file contains a rule that ought to apply globally and the script’s STANDARD lacks it, ask the doc-init maintainer to merge it into STANDARD and bump the version—do not write global files from doc-compact yourself.
 
-## 十一条标准
+**Mental model:** document structure is two-dimensional—**three vertical layers** (rules layer `AGENTS.md` always resident → index layer `<DOMAIN>_INDEX.md` on demand by task → content layer concrete docs on demand) + **horizontal types** (open set; five common types as defaults; new types may be added and registered). Audits must not fail a type merely because it is outside the common five—only check “registered in the doc-type table + placed on the correct path.”
 
-1. **唯一一级入口**：每个项目全部文档导航集中在根 `AGENTS.md` 的「文档导航」章节；禁止裸 `OVERVIEW.md` / `INDEX.md` 与根竞争成为散索引；合法二级索引必须具名为 `<DOMAIN>_INDEX.md`，只能经根 `AGENTS.md` 到达（两级索引特例见 SKILL.md §3）。
-2. **最多两跳直达**：核心文档从根一跳直达；次要文档经任务域 `<DOMAIN>_INDEX.md` 两跳到达（`AGENTS.md → <DOMAIN>_INDEX.md → 文档`）；禁止三级以上嵌套（两级索引特例见 SKILL.md §3）。
-3. **只列真实文档**：导航只列真实存在的文档，一行一个、带一句话用途；不写空占位、不写「暂无」「以前叫 X」这类历史 / 元注释。
-4. **描述写成「何时该读」**：用途回答「带着什么问题 / 改哪块代码时该读它」，模型靠这句话路由。
-5. **inline 指针为主、底部表兜底**：文档指针就近贴在它支撑的那条规则 / 不变量旁；底部「文档导航」表作兜底全集。
-6. **CLAUDE.md 内容只能是一行 `@*.md`**：不承载内容，只引入同级 AGENTS.md；无独立约定的模块不单设 AGENTS.md/CLAUDE.md。
-7. **文档放置与命名**：各类型有固定目录（`docs/`、`docs/design/`、`docs/troubleshooting/YYYY-MM-DD-*` 等）；`.md` 不放源码目录（`AGENTS.md` 例外但需在构建中排除）。**完整放置表以全局指令文件为准**，本 skill 只校验「是否就位」。
-8. **增删改文档 → 同步索引**：任何文档增删或换位置，同步根 `AGENTS.md` 文档导航与全仓相对链接。
-9. **两级索引两条独立触发**：① 规模驱动——导航占 `AGENTS.md` ≳ 1/2 或规则被挤到文件后半（主判据），或 `>500 行` 兜底；② 类型驱动（预置折叠，与项目大小解耦）——故障排查记录 / Review 台账 ≥ 3 篇即应折叠到对应 `<DOMAIN>_INDEX.md`，根留一条强路由（见 SKILL.md §3）。
-10. **规范且精简**（见 SKILL.md §4 / §5）：命名 / 链接格式 / 语言符合规范，导航按领域聚类有序；正文删去不改变读者行为的冗余，保留改变动作 / 判断的内容。
-11. **易变事实不跨文档复述（单一来源）**：会随外部条件变化的具体数字 / 状态（API 积分档位、限频数字、账户余额、版本号、密钥有效期等）只在一个「权威源文档」里维护，其他文档分两类处理：
-    - **权威相邻文档**（如 source profile、policy doc）：可链接到权威源，不复述数字。
-    - **其他文档**（研究报告、规格说明、评估文档）：只写**不随该事实变化的结论性判断**（如「实时需单独开通」「接口属通用积分门控类」），完全不出现具体数字，也不强制加链接。
-    - **反模式**：把所有含该数字的文档都改成「→ 链接到权威源」——这创造过度耦合，使所有文档变成权威源的卫星文档；改的越多越难维护。正确修法是：权威源维护事实，其余文档写不变的原则。
+## Eleven standards
 
-目标环境若已用别的措辞表达了等价规则，视为合规，不必改写。
+1. **Single primary entry:** every project’s full doc navigation lives in the root `AGENTS.md` “文档导航” / Document navigation section; bare `OVERVIEW.md` / `INDEX.md` must not compete as scattered indexes; legal secondary indexes must be named `<DOMAIN>_INDEX.md` and reachable only via root `AGENTS.md` (two-level-index special case: SKILL.md Step 3).
+2. **At most two hops:** core docs one hop from root; secondary docs two hops via task-domain `<DOMAIN>_INDEX.md` (`AGENTS.md → <DOMAIN>_INDEX.md → doc`); no nesting beyond two levels (special case: SKILL.md Step 3).
+3. **List only real docs:** navigation lists only documents that exist—one line each with a one-sentence purpose; no empty placeholders, no “none yet,” no “formerly called X” historical/meta notes.
+4. **Describe “when to read”:** purpose answers “with what question / when changing which code should I read this”—models route on that sentence.
+5. **Inline pointers primary, bottom table fallback:** place doc pointers next to the rule/invariant they support; the bottom “文档导航” / Document navigation table is the complete fallback set.
+6. **CLAUDE.md content is only one `@*.md` line:** carries no content; only pulls in sibling AGENTS.md; modules without independent conventions do not get their own AGENTS.md/CLAUDE.md.
+7. **Placement and naming:** each type has a fixed directory (`docs/`, `docs/design/`, `docs/troubleshooting/YYYY-MM-DD-*`, etc.); `.md` files do not live in source trees (`AGENTS.md` is an exception but must be excluded from builds). **The full placement table is owned by the global instruction file**; this skill only checks “is it in place.”
+8. **Add/remove/move a doc → sync indexes:** any add, delete, or relocate syncs root `AGENTS.md` navigation and whole-repo relative links.
+9. **Two independent secondary-index triggers:** ① size-driven—navigation occupies ≳ 1/2 of `AGENTS.md` or rules are pushed into the second half (primary), or `>500` lines as fallback; ② type-driven (preset fold, independent of project size)—troubleshooting records / Review ledgers ≥ 3 should fold into the matching `<DOMAIN>_INDEX.md`, with one strong route left at root (see SKILL.md Step 3).
+10. **Normative and compact** (see SKILL.md Steps 4 / 5): naming / link format / language follow the rules; navigation is ordered by domain clusters; body text drops redundancy that does not change reader behavior and keeps content that changes action / judgment.
+11. **Volatile facts are not restated across docs (single source):** concrete numbers / states that change with external conditions (API credit tiers, rate limits, balances, version numbers, key expiry, etc.) are maintained in exactly one “authoritative source” doc; other docs split into two treatments:
+    - **Authority-adjacent docs** (e.g. source profile, policy doc): may link to the authority; do not restate the number.
+    - **Other docs** (research notes, specs, evals): write only **conclusions that do not change when the fact changes** (e.g. “realtime requires a separate enablement,” “this API is a generic credit-gated class”); no concrete numbers, and no forced links.
+    - **Anti-pattern:** rewriting every doc that had the number into “→ link to the authority”—that over-couples everything into satellite docs of the authority and gets harder to maintain the more you do it. Correct fix: authority maintains the fact; other docs write stable principles.
+
+If the target environment already expresses equivalent rules in other wording, treat it as compliant—do not rewrite for style alone.

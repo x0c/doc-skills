@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-doc-init 深度知识提取脚本。
+doc-init deep knowledge extraction.
 
-读取 project_inventory.py 输出的 inventory JSON，按检测到的语言栈
-用正则机械提取以下模式（不做业务判断）：
-  - 状态枚举（status_patterns）
-  - 并发控制（concurrency_patterns）
-  - 事件/消息（event_patterns）
-  - 框架组件注册（framework_components）
-  - 软删除标记（soft_delete_patterns）
-  - 幂等标记（idempotency_patterns）
-  - 可运行项目元数据（runnable_project）
-  - 热点文件（hot_files）
+Reads project_inventory.py inventory JSON and mechanically extracts patterns
+for the detected language stack (no business judgment):
+  - status enums (status_patterns)
+  - concurrency control (concurrency_patterns)
+  - events/messaging (event_patterns)
+  - framework component registration (framework_components)
+  - soft-delete markers (soft_delete_patterns)
+  - idempotency markers (idempotency_patterns)
+  - runnable project metadata (runnable_project)
+  - hot files (hot_files)
 
-用法：
+Usage:
   python3 depth_scanner.py --root <project_root> --inventory <inventory.json> --output <depth_scan.json>
 """
 
@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# 跳过目录（与 project_inventory.py 保持一致）
+# Skip dirs (keep in sync with project_inventory.py)
 # ---------------------------------------------------------------------------
 IGNORE_DIRS = {
     ".git",
@@ -59,179 +59,179 @@ IGNORE_DIRS = {
     "vendor",
 }
 
-# 大文件只读前 N 行
+# Large files: read only the first N lines
 LARGE_FILE_LINE_LIMIT = 500
 LARGE_FILE_BYTE_LIMIT = 100 * 1024  # 100 KB
 
-# 每类结果最多收录数量，防止输出过大
+# Cap results per category to keep output bounded
 RESULT_LIMIT = 200
 
-# 总运行时间上限（秒）
+# Total runtime budget (seconds)
 TIMEOUT_SECONDS = 30
 
 # ---------------------------------------------------------------------------
-# 多语言正则模式配置
+# Multi-language regex pattern config
 # ---------------------------------------------------------------------------
 
-# 每个语言族的模式字典，key 对应输出字段名
-# value 是 (compiled_pattern, 用途说明)
+# Per language-family pattern dict; keys match output field names
+# value is (compiled_pattern, purpose description)
 LANG_PATTERNS: dict[str, dict[str, list[tuple[re.Pattern[str], str]]]] = {
     "java_kotlin": {
         "status": [
-            (re.compile(r"enum\s+\w*(?:Status|State)\w*", re.I), "Java/Kotlin 状态枚举"),
+            (re.compile(r"enum\s+\w*(?:Status|State)\w*", re.I), "Java/Kotlin status enum"),
         ],
         "concurrency": [
-            (re.compile(r"@Version\b"), "JPA/Hibernate 乐观锁 @Version"),
-            (re.compile(r"synchronized\s*\(|ReentrantLock|StampedLock"), "Java 显式锁"),
+            (re.compile(r"@Version\b"), "JPA/Hibernate optimistic lock @Version"),
+            (re.compile(r"synchronized\s*\(|ReentrantLock|StampedLock"), "Java explicit lock"),
         ],
         "event": [
-            (re.compile(r"class\s+\w+Event\b"), "事件类定义"),
-            (re.compile(r"@(?:EventListener|TransactionalEventListener)\b"), "Spring 事件监听"),
-            (re.compile(r"publishEvent\s*\(|applicationEventPublisher\.publish", re.I), "Spring 事件发布"),
-            (re.compile(r"@(?:RabbitListener|KafkaListener)\b"), "MQ 监听注解"),
+            (re.compile(r"class\s+\w+Event\b"), "event class definition"),
+            (re.compile(r"@(?:EventListener|TransactionalEventListener)\b"), "Spring event listener"),
+            (re.compile(r"publishEvent\s*\(|applicationEventPublisher\.publish", re.I), "Spring event publish"),
+            (re.compile(r"@(?:RabbitListener|KafkaListener)\b"), "MQ listener annotation"),
         ],
         "component": [
-            (re.compile(r'@LiteflowComponent\s*\('), "LiteFlow 组件注册"),
-            (re.compile(r'@(?:Component|Service|Controller|RestController)\s*\(\s*(?:value\s*=\s*)?["\']'), "Spring 具名 Bean"),
-            (re.compile(r"@Scheduled\b"), "Spring 定时任务"),
+            (re.compile(r'@LiteflowComponent\s*\('), "LiteFlow component registration"),
+            (re.compile(r'@(?:Component|Service|Controller|RestController)\s*\(\s*(?:value\s*=\s*)?["\']'), "Spring named Bean"),
+            (re.compile(r"@Scheduled\b"), "Spring scheduled task"),
         ],
         "idempotency": [
-            (re.compile(r"idempotent|dedup|idempotentId|timingIdempotentId", re.I), "幂等字段/标记"),
+            (re.compile(r"idempotent|dedup|idempotentId|timingIdempotentId", re.I), "idempotency field/marker"),
         ],
         "soft_delete": [
-            (re.compile(r"biz_status|is_deleted|deleted_at|isDeleted", re.I), "软删除字段"),
-            (re.compile(r"\.ne\s*\(.*?DELETED", re.I), "MyBatis-Plus ne(DELETED) 查询"),
+            (re.compile(r"biz_status|is_deleted|deleted_at|isDeleted", re.I), "soft-delete field"),
+            (re.compile(r"\.ne\s*\(.*?DELETED", re.I), "MyBatis-Plus ne(DELETED) query"),
         ],
         "sharding": [
-            (re.compile(r"BusinessContextHolder|ShardingContext", re.I), "分表上下文持有"),
+            (re.compile(r"BusinessContextHolder|ShardingContext", re.I), "sharding context holder"),
             (re.compile(r"@TableName\s*\("), "MyBatis-Plus @TableName"),
         ],
     },
     "python": {
         "status": [
-            (re.compile(r"class\s+\w*(?:Status|State)\s*[\w(,\s]*(?:Enum|IntEnum)\b"), "Python 状态枚举"),
-            (re.compile(r"STATUS_CHOICES\s*="), "Django choices 模式"),
+            (re.compile(r"class\s+\w*(?:Status|State)\s*[\w(,\s]*(?:Enum|IntEnum)\b"), "Python status enum"),
+            (re.compile(r"STATUS_CHOICES\s*="), "Django choices pattern"),
         ],
         "concurrency": [
-            (re.compile(r"version_id|_version\b|select_for_update\s*\("), "Python ORM 乐观锁"),
+            (re.compile(r"version_id|_version\b|select_for_update\s*\("), "Python ORM optimistic lock"),
         ],
         "event": [
             (re.compile(r"signal\.\w+\.connect|@receiver\s*\("), "Django signal"),
-            (re.compile(r"celery\.task|@app\.task|@shared_task"), "Celery 任务"),
-            (re.compile(r"publish_event|event_bus\.publish", re.I), "事件总线发布"),
+            (re.compile(r"celery\.task|@app\.task|@shared_task"), "Celery task"),
+            (re.compile(r"publish_event|event_bus\.publish", re.I), "event-bus publish"),
         ],
         "component": [
-            (re.compile(r"@app\.route\s*\(|@router\."), "Flask/FastAPI 路由"),
+            (re.compile(r"@app\.route\s*\(|@router\."), "Flask/FastAPI route"),
             (re.compile(r"@dramatiq\.actor|@celery\.task"), "Dramatiq/Celery Actor"),
         ],
         "idempotency": [
-            (re.compile(r"idempotency_key|get_or_create\s*\(", re.I), "幂等 key / get_or_create"),
-            (re.compile(r"ON CONFLICT", re.I), "SQL ON CONFLICT 幂等"),
+            (re.compile(r"idempotency_key|get_or_create\s*\(", re.I), "idempotency key / get_or_create"),
+            (re.compile(r"ON CONFLICT", re.I), "SQL ON CONFLICT idempotency"),
         ],
         "soft_delete": [
-            (re.compile(r"is_deleted|deleted_at|SoftDeletable"), "Python 软删除字段"),
-            (re.compile(r"objects\.filter.*\.exclude.*deleted", re.I), "Django 软删除查询"),
+            (re.compile(r"is_deleted|deleted_at|SoftDeletable"), "Python soft-delete field"),
+            (re.compile(r"objects\.filter.*\.exclude.*deleted", re.I), "Django soft-delete query"),
         ],
         "sharding": [
-            (re.compile(r"tenant_id|schema_name|connection\.set_schema", re.I), "多租户/分库路由"),
+            (re.compile(r"tenant_id|schema_name|connection\.set_schema", re.I), "multi-tenant / DB-routing"),
         ],
     },
     "typescript_javascript": {
         "status": [
-            (re.compile(r"enum\s+\w*Status\b"), "TS 状态枚举"),
-            (re.compile(r"type\s+\w*Status\s*=|Status\s*=\s*\{"), "TS 联合类型/对象状态"),
+            (re.compile(r"enum\s+\w*Status\b"), "TS status enum"),
+            (re.compile(r"type\s+\w*Status\s*=|Status\s*=\s*\{"), "TS union type / object status"),
         ],
         "concurrency": [
-            (re.compile(r"@VersionColumn\(\)|version.*:\s*number", re.I), "TypeORM 乐观锁"),
-            (re.compile(r"optimisticLock|_version\b", re.I), "乐观锁标记"),
+            (re.compile(r"@VersionColumn\(\)|version.*:\s*number", re.I), "TypeORM optimistic lock"),
+            (re.compile(r"optimisticLock|_version\b", re.I), "optimistic-lock marker"),
         ],
         "event": [
             (re.compile(r"EventEmitter|\.emit\s*\(|\.on\s*\("), "Node.js EventEmitter"),
-            (re.compile(r"@OnEvent\s*\(|pubSub\.publish|eventBus\.emit", re.I), "事件发布/订阅"),
+            (re.compile(r"@OnEvent\s*\(|pubSub\.publish|eventBus\.emit", re.I), "event publish/subscribe"),
         ],
         "component": [
-            (re.compile(r"@(?:Controller|Injectable|Module)\s*\("), "NestJS 装饰器"),
-            (re.compile(r'app\.(?:get|post|put|delete|patch)\s*\(|router\.(?:get|post|put)'), "Express/Koa 路由"),
+            (re.compile(r"@(?:Controller|Injectable|Module)\s*\("), "NestJS decorator"),
+            (re.compile(r'app\.(?:get|post|put|delete|patch)\s*\(|router\.(?:get|post|put)'), "Express/Koa route"),
         ],
         "idempotency": [
-            (re.compile(r"idempotencyKey|idempotent|upsert\s*\(", re.I), "幂等 key / upsert"),
+            (re.compile(r"idempotencyKey|idempotent|upsert\s*\(", re.I), "idempotency key / upsert"),
             (re.compile(r"ON CONFLICT", re.I), "SQL ON CONFLICT"),
         ],
         "soft_delete": [
-            (re.compile(r"deletedAt|isDeleted|@DeleteDateColumn", re.I), "TS 软删除字段"),
+            (re.compile(r"deletedAt|isDeleted|@DeleteDateColumn", re.I), "TS soft-delete field"),
             (re.compile(r"withDeleted\s*\(\)", re.I), "TypeORM withDeleted"),
         ],
         "sharding": [
-            (re.compile(r"tenantId|cls\.schema|setSchema|multiTenancy", re.I), "多租户/分库路由"),
+            (re.compile(r"tenantId|cls\.schema|setSchema|multiTenancy", re.I), "multi-tenant / DB-routing"),
         ],
     },
     "go": {
         "status": [
-            (re.compile(r"Status\w+\s+(?:int|string)|State\w+\s+(?:int|string)"), "Go 状态常量类型"),
-            (re.compile(r"iota.*(?:Status|State)", re.I), "Go iota 状态枚举"),
-            (re.compile(r"type\s+\w*Status\s+(?:int|string)\b"), "Go 命名状态类型"),
+            (re.compile(r"Status\w+\s+(?:int|string)|State\w+\s+(?:int|string)"), "Go status constant type"),
+            (re.compile(r"iota.*(?:Status|State)", re.I), "Go iota status enum"),
+            (re.compile(r"type\s+\w*Status\s+(?:int|string)\b"), "Go named status type"),
         ],
         "concurrency": [
-            (re.compile(r"version\s+(?:int|int64)|Version\s+(?:int|int64)"), "Go 版本号乐观锁"),
-            (re.compile(r"sync\.Mutex|sync\.RWMutex|atomic\."), "Go 同步原语"),
-            (re.compile(r"\.CAS\s*\(|compare_and_swap", re.I), "CAS 操作"),
+            (re.compile(r"version\s+(?:int|int64)|Version\s+(?:int|int64)"), "Go version optimistic lock"),
+            (re.compile(r"sync\.Mutex|sync\.RWMutex|atomic\."), "Go sync primitive"),
+            (re.compile(r"\.CAS\s*\(|compare_and_swap", re.I), "CAS operation"),
         ],
         "event": [
-            (re.compile(r"chan\s+\w*Event"), "Go channel 事件"),
-            (re.compile(r"\.Publish\s*\(|\.Subscribe\s*\("), "发布/订阅调用"),
+            (re.compile(r"chan\s+\w*Event"), "Go channel event"),
+            (re.compile(r"\.Publish\s*\(|\.Subscribe\s*\("), "publish/subscribe call"),
             (re.compile(r"nats\.Conn|amqp\.Channel"), "NATS/AMQP"),
         ],
         "component": [
-            (re.compile(r"func\s+init\s*\(\s*\)"), "Go init 注册"),
-            (re.compile(r"http\.Handle\s*\(|mux\.Handle\s*\("), "Go HTTP 路由"),
-            (re.compile(r'gin\.(?:GET|POST|PUT|DELETE)\s*\(|echo\.(?:GET|POST)'), "Gin/Echo 路由"),
+            (re.compile(r"func\s+init\s*\(\s*\)"), "Go init registration"),
+            (re.compile(r"http\.Handle\s*\(|mux\.Handle\s*\("), "Go HTTP route"),
+            (re.compile(r'gin\.(?:GET|POST|PUT|DELETE)\s*\(|echo\.(?:GET|POST)'), "Gin/Echo route"),
         ],
         "idempotency": [
-            (re.compile(r"idempotent|SetNX\s*\(|setnx\b", re.I), "Redis SetNX 幂等"),
-            (re.compile(r"InsertOrUpdate|UPSERT\b", re.I), "Upsert 幂等"),
+            (re.compile(r"idempotent|SetNX\s*\(|setnx\b", re.I), "Redis SetNX idempotency"),
+            (re.compile(r"InsertOrUpdate|UPSERT\b", re.I), "Upsert idempotency"),
         ],
         "soft_delete": [
-            (re.compile(r"deleted_at|IsDeleted|gorm\.DeletedAt"), "GORM 软删除"),
+            (re.compile(r"deleted_at|IsDeleted|gorm\.DeletedAt"), "GORM soft delete"),
             (re.compile(r"Unscoped\s*\(\)"), "GORM Unscoped"),
         ],
         "sharding": [
-            (re.compile(r"context\.Value\s*\(|WithValue.*tenant", re.I), "context 分片路由"),
-            (re.compile(r"shardKey|partition\b", re.I), "分片键"),
+            (re.compile(r"context\.Value\s*\(|WithValue.*tenant", re.I), "context shard routing"),
+            (re.compile(r"shardKey|partition\b", re.I), "shard key"),
         ],
     },
     "csharp_dotnet": {
         "status": [
-            (re.compile(r"enum\s+\w*(?:Status|State)\b"), "C# 状态枚举"),
-            (re.compile(r"\[Flags\]\s*\n\s*enum\b"), "C# Flags 枚举"),
+            (re.compile(r"enum\s+\w*(?:Status|State)\b"), "C# status enum"),
+            (re.compile(r"\[Flags\]\s*\n\s*enum\b"), "C# Flags enum"),
         ],
         "concurrency": [
-            (re.compile(r"\[ConcurrencyCheck\]|\[Timestamp\]|IsRowVersion\s*\("), "EF Core 并发标记"),
-            (re.compile(r"Interlocked\.|Monitor\.Enter|SemaphoreSlim"), ".NET 并发原语"),
+            (re.compile(r"\[ConcurrencyCheck\]|\[Timestamp\]|IsRowVersion\s*\("), "EF Core concurrency marker"),
+            (re.compile(r"Interlocked\.|Monitor\.Enter|SemaphoreSlim"), ".NET concurrency primitive"),
         ],
         "event": [
-            (re.compile(r"INotification\b|IMediator\b"), "MediatR 事件/命令"),
-            (re.compile(r"\.Publish\s*\(|DomainEvent\b|EventHandler\b"), "领域事件"),
+            (re.compile(r"INotification\b|IMediator\b"), "MediatR event/command"),
+            (re.compile(r"\.Publish\s*\(|DomainEvent\b|EventHandler\b"), "domain event"),
         ],
         "component": [
             (re.compile(r"\[(?:ApiController|HttpGet|HttpPost|HttpPut|HttpDelete)\]"), "ASP.NET Controller"),
-            (re.compile(r"services\.Add|builder\.Services\.Add"), ".NET DI 注册"),
+            (re.compile(r"services\.Add|builder\.Services\.Add"), ".NET DI registration"),
         ],
         "idempotency": [
-            (re.compile(r"IdempotencyKey|idempotent", re.I), "幂等 key"),
-            (re.compile(r"MERGE\s+INTO|ExecuteUpdateOrInsert", re.I), "Upsert 语句"),
+            (re.compile(r"IdempotencyKey|idempotent", re.I), "idempotency key"),
+            (re.compile(r"MERGE\s+INTO|ExecuteUpdateOrInsert", re.I), "Upsert statement"),
         ],
         "soft_delete": [
-            (re.compile(r"IsDeleted|DeletedAt|ISoftDelete\b"), "C# 软删除接口/字段"),
-            (re.compile(r"HasQueryFilter.*!.*[Ii]s[Dd]eleted"), "EF Core 全局过滤"),
+            (re.compile(r"IsDeleted|DeletedAt|ISoftDelete\b"), "C# soft-delete interface/field"),
+            (re.compile(r"HasQueryFilter.*!.*[Ii]s[Dd]eleted"), "EF Core global filter"),
         ],
         "sharding": [
-            (re.compile(r"ITenantProvider|TenantId|UseDatabasePerTenant", re.I), "多租户路由"),
-            (re.compile(r"IMultiTenantDbContext"), "多租户 DbContext"),
+            (re.compile(r"ITenantProvider|TenantId|UseDatabasePerTenant", re.I), "multi-tenant routing"),
+            (re.compile(r"IMultiTenantDbContext"), "multi-tenant DbContext"),
         ],
     },
 }
 
-# 语言标签 → 模式族映射（来自 project_inventory.py 的 language 字段）
+# Language label → pattern-family map (from project_inventory.py language field)
 LANG_TO_PATTERN_KEY: dict[str, str] = {
     "Java": "java_kotlin",
     "Kotlin": "java_kotlin",
@@ -243,7 +243,7 @@ LANG_TO_PATTERN_KEY: dict[str, str] = {
     "F#/.NET": "csharp_dotnet",
 }
 
-# 文件扩展名 → 语言标签
+# File extension → language label
 EXT_TO_LANG: dict[str, str] = {
     ".java": "Java",
     ".kt": "Kotlin",
@@ -260,34 +260,34 @@ EXT_TO_LANG: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# 状态枚举值提取（Java/Kotlin/Go/C#/Python/TS 通用）
+# Status enum value extraction (shared across Java/Kotlin/Go/C#/Python/TS)
 # ---------------------------------------------------------------------------
 
-# 匹配枚举块 { ... }，只取前 2000 字符避免跨块匹配
+# Match enum block { ... }; only first 2000 chars to avoid cross-block matches
 _ENUM_BODY_RE = re.compile(r"\{([^{}]{0,2000})\}", re.S)
-# 枚举值：全大写下划线 或 SCREAMING_SNAKE + 可选括号
+# Enum values: ALL_CAPS underscore / SCREAMING_SNAKE + optional parens
 _ENUM_VALUE_RE = re.compile(r"\b([A-Z][A-Z0-9_]{1,40})\b")
 
 
 def extract_enum_values(text: str, start: int) -> list[str]:
-    """从 start 位置之后提取枚举值列表（最多取前 20 个全大写成员）。"""
+    """Extract enum value list after start (at most first 20 ALL_CAPS members)."""
     fragment = text[start : start + 2000]
     m = _ENUM_BODY_RE.search(fragment)
     if not m:
         return []
     body = m.group(1)
     values = _ENUM_VALUE_RE.findall(body)
-    # 过滤掉 Java 关键字等噪声
+    # Filter Java keywords and similar noise
     stop_words = {"NULL", "TRUE", "FALSE", "VOID", "INT", "LONG", "STRING", "BYTE"}
     return [v for v in values if v not in stop_words][:20]
 
 
 # ---------------------------------------------------------------------------
-# 文件迭代
+# File iteration
 # ---------------------------------------------------------------------------
 
 def iter_source_files(root: Path, active_exts: set[str]) -> list[Path]:
-    """遍历源码文件，跳过忽略目录，只返回 active_exts 中的扩展名。"""
+    """Walk source files, skip ignore dirs, return only extensions in active_exts."""
     result: list[Path] = []
     for current, dirs, names in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".cache"))
@@ -299,7 +299,7 @@ def iter_source_files(root: Path, active_exts: set[str]) -> list[Path]:
 
 
 def read_file_lines(path: Path) -> list[str]:
-    """读取文件，大文件只读前 LARGE_FILE_LINE_LIMIT 行。"""
+    """Read a file; large files only the first LARGE_FILE_LINE_LIMIT lines."""
     try:
         size = path.stat().st_size
         if size > LARGE_FILE_BYTE_LIMIT:
@@ -307,7 +307,7 @@ def read_file_lines(path: Path) -> list[str]:
                 return [fh.readline() for _ in range(LARGE_FILE_LINE_LIMIT)]
         return path.read_text(encoding="utf-8", errors="ignore").splitlines(keepends=True)
     except OSError as e:
-        warnings.warn(f"跳过文件 {path}: {e}")
+        warnings.warn(f"skip file {path}: {e}")
         return []
 
 
@@ -320,7 +320,7 @@ def rel(path: Path, root: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 各类模式扫描
+# Pattern scans by category
 # ---------------------------------------------------------------------------
 
 def scan_status_patterns(
@@ -348,11 +348,11 @@ def scan_concurrency_patterns(
     if len(results) >= RESULT_LIMIT:
         return
     patterns = LANG_PATTERNS.get(lang_key, {}).get("concurrency", [])
-    # 提取 @Version 前后的字段名（Java 场景）
+    # Extract field name near @Version (Java)
     field_re = re.compile(r"(?:private|protected|public|var|val)\s+\S+\s+(\w+)\s*;")
     for pattern, signal in patterns:
         for m in pattern.finditer(text):
-            # 尝试提取临近字段名
+            # Try to extract nearby field name
             nearby = text[m.start(): m.start() + 200]
             fm = field_re.search(nearby)
             field = fm.group(1) if fm else ""
@@ -372,7 +372,7 @@ def scan_event_patterns(
     if len(publishers) >= RESULT_LIMIT:
         return
     patterns = LANG_PATTERNS.get(lang_key, {}).get("event", [])
-    # 提取事件类名（简单：从 class XxxEvent 或 publishEvent(new XxxEvent)）
+    # Extract event class name (simple: class XxxEvent or publishEvent(new XxxEvent))
     event_name_re = re.compile(r"(?:class\s+(\w+Event\b)|publish\w*\s*\(\s*(?:new\s+)?(\w+Event)\b)", re.I)
     for pattern, _ in patterns:
         for m in pattern.finditer(text):
@@ -383,7 +383,7 @@ def scan_event_patterns(
             publishers.append({
                 "publisher_file": rel(path, root),
                 "event_name": event_name,
-                "subscriber_file": "",  # 跨文件关联留空，由 LLM 阶段补充
+                "subscriber_file": "",  # cross-file link left empty for LLM stage
                 "signal": m.group(0).strip()[:80],
             })
             if len(publishers) >= RESULT_LIMIT:
@@ -396,7 +396,7 @@ def scan_framework_components(
     if len(results) >= RESULT_LIMIT:
         return
     patterns = LANG_PATTERNS.get(lang_key, {}).get("component", [])
-    # LiteFlow 组件 ID 提取
+    # LiteFlow component ID extraction
     liteflow_id_re = re.compile(r'@LiteflowComponent\s*\(\s*(?:id\s*=\s*)?["\']([^"\']+)["\'](?:\s*,\s*name\s*=\s*["\']([^"\']+)["\'])?')
     for pattern, comp_type in patterns:
         for m in pattern.finditer(text):
@@ -426,14 +426,14 @@ def scan_soft_delete(
     patterns = LANG_PATTERNS.get(lang_key, {}).get("soft_delete", [])
     for pattern, _ in patterns:
         if pattern.search(text):
-            # 提取第一个匹配的字段名
+            # Extract first matching field name
             m = pattern.search(text)
             results.append({
                 "file": rel(path, root),
                 "field": m.group(0).strip()[:60] if m else "",
                 "signal": m.group(0).strip()[:80] if m else "",
             })
-            return  # 每个文件只记录一次
+            return  # record once per file
 
 
 def scan_idempotency(
@@ -450,15 +450,15 @@ def scan_idempotency(
                 "key_field": m.group(0).strip()[:60],
                 "signal": m.group(0).strip()[:80],
             })
-            return  # 每个文件只记录一次
+            return  # record once per file
 
 
 # ---------------------------------------------------------------------------
-# 可运行项目检测
+# Runnable project detection
 # ---------------------------------------------------------------------------
 
 def _is_ignored_path(path: Path) -> bool:
-    """检查路径是否包含应跳过的目录段。"""
+    """True if path contains a directory segment that should be skipped."""
     for part in path.parts:
         if part in IGNORE_DIRS:
             return True
@@ -466,12 +466,12 @@ def _is_ignored_path(path: Path) -> bool:
 
 
 def _rglob_filtered(base: Path, pattern: str) -> list[Path]:
-    """rglob 变体，自动跳过 IGNORE_DIRS 中的子树。"""
+    """rglob variant that skips IGNORE_DIRS subtrees."""
     return [p for p in base.rglob(pattern) if not _is_ignored_path(p)]
 
 
 def detect_runnable_project(root: Path) -> dict[str, Any]:
-    """检测项目类型、端口、启动命令、日志路径。"""
+    """Detect project type, ports, start command, and log paths."""
     result: dict[str, Any] = {
         "type": "unknown",
         "ports": [],
@@ -493,7 +493,7 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
         if "spring-boot-maven-plugin" in text or "spring-boot-starter" in text:
             result["type"] = "spring-boot"
             module_dir = pom.parent
-            # 端口：扫描 application*.properties / application*.yml（跳过 target/）
+            # Ports: scan application*.properties / application*.yml (skip target/)
             for prop_path in _rglob_filtered(module_dir, "application*.properties"):
                 prop_text = read_text_safe(prop_path)
                 m = re.search(r"server\.port\s*=\s*(\d+)", prop_text)
@@ -512,14 +512,14 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
                         "port": m.group(1),
                         "source": rel(yml_path, root),
                     })
-            # 启动命令：用 host 模块相对路径
+            # Start command: use host-module relative path
             module_rel = rel(module_dir, root)
             result["start_commands"].append(f"mvn spring-boot:run -pl {module_rel}")
-            # 日志路径：只取 src/main 同层的 logs 目录
+            # Log path: only logs/ sibling of src/main
             for log_dir in _rglob_filtered(module_dir, "logs"):
                 if log_dir.is_dir() and not _is_ignored_path(log_dir):
                     result["log_paths"].append(rel(log_dir, root) + "/*.log")
-        # 只检测第一个匹配的
+        # Only take the first match
         if result["type"] != "unknown":
             break
 
@@ -542,7 +542,7 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
             if '"express"' in text or '"@nestjs/core"' in text or '"fastify"' in text:
                 result["type"] = "express"
                 result["start_commands"].append("npm start")
-                # 扫描 .env 或源码中的 listen(
+                # Scan .env or source for listen(
                 for env_file in [root / ".env", root / ".env.local"]:
                     if env_file.exists():
                         env_text = read_text_safe(env_file)
@@ -590,14 +590,14 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
         if (root / "setup.py").exists() or (root / "pyproject.toml").exists():
             result["type"] = "library"
         elif any(_rglob_filtered(root, "*.py")):
-            # 检测 CLI
+            # Detect CLI
             for py in list(_rglob_filtered(root, "*.py"))[:50]:
                 text = read_text_safe(py)
                 if "argparse.ArgumentParser" in text or "click.command" in text:
                     result["type"] = "cli"
                     break
 
-    # 去重端口
+    # Dedupe ports
     seen_ports: set[str] = set()
     unique_ports = []
     for p in result["ports"]:
@@ -611,11 +611,11 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# 热点文件
+# Hot files
 # ---------------------------------------------------------------------------
 
 def get_hot_files(root: Path) -> list[dict[str, Any]]:
-    """通过 git log 获取修改次数最多的前 20 个文件。"""
+    """Top 20 most-changed files via git log."""
     if not (root / ".git").exists():
         return []
     try:
@@ -641,11 +641,11 @@ def get_hot_files(root: Path) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# 可运行项目类型检测
+# Runnable project type detection
 # ---------------------------------------------------------------------------
 
 def detect_runnable_project(root: Path) -> dict[str, Any]:
-    """检测项目可运行类型、端口、启动命令和日志路径。"""
+    """Detect runnable project type, ports, start command, and log paths."""
     result: dict[str, Any] = {"type": "unknown", "ports": [], "start_commands": [], "log_paths": []}
 
     # Spring Boot
@@ -745,10 +745,10 @@ def detect_runnable_project(root: Path) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# 实体字段提取（entity_fields）
+# Entity field extraction (entity_fields)
 # ---------------------------------------------------------------------------
 
-# 各语言栈的实体标记和字段提取正则
+# Per-stack entity markers and field-extraction regexes
 _ENTITY_MARKERS: dict[str, list[re.Pattern[str]]] = {
     "java_kotlin": [
         re.compile(r'@TableName\s*\(\s*["\']([^"\']+)'),  # MyBatis-Plus
@@ -773,12 +773,12 @@ _ENTITY_MARKERS: dict[str, list[re.Pattern[str]]] = {
     ],
 }
 
-# Java 字段提取：捕获类型、字段名、以及可能的注解
+# Java field extraction: capture type, field name, and possible annotations
 _JAVA_FIELD_RE = re.compile(
-    r'(?:(?:@\w+(?:\([^)]*\))?)\s*)*'  # 可能的注解
+    r'(?:(?:@\w+(?:\([^)]*\))?)\s*)*'  # optional annotations
     r'(?:private|protected|public)?\s+'
-    r'([\w<>,?\s]+?)\s+'  # 类型
-    r'(\w+)\s*[;=]',  # 字段名
+    r'([\w<>,?\s]+?)\s+'  # type
+    r'(\w+)\s*[;=]',  # field name
 )
 _JAVA_TABLEFIELD_RE = re.compile(r'@TableField\s*\(\s*(?:value\s*=\s*)?["\']([^"\']+)')
 _JAVA_VERSION_RE = re.compile(r'@Version\b')
@@ -787,7 +787,7 @@ _JAVA_TABLELOGIC_RE = re.compile(r'@TableLogic\b')
 
 def scan_entity_fields(path: Path, root: Path, text: str, lang_key: str,
                        results: list[dict[str, Any]]) -> None:
-    """提取实体类的字段列表，包含字段名、类型、注解标记。"""
+    """Extract entity class fields: name, type, annotation markers."""
     if len(results) >= RESULT_LIMIT:
         return
 
@@ -808,7 +808,7 @@ def scan_entity_fields(path: Path, root: Path, text: str, lang_key: str,
     if not is_entity:
         return
 
-    # 提取类名
+    # Extract class name
     class_match = re.search(r'(?:public\s+)?class\s+(\w+)', text)
     class_name = class_match.group(1) if class_match else path.stem
 
@@ -816,7 +816,7 @@ def scan_entity_fields(path: Path, root: Path, text: str, lang_key: str,
         fields: list[dict[str, str]] = []
         for line in text.splitlines():
             line_stripped = line.strip()
-            # 跳过方法定义和注释
+            # Skip method definitions and comments
             if line_stripped.startswith("//") or line_stripped.startswith("/*") or line_stripped.startswith("*"):
                 continue
             if "(" in line_stripped and ")" in line_stripped and not line_stripped.endswith(";"):
@@ -826,12 +826,12 @@ def scan_entity_fields(path: Path, root: Path, text: str, lang_key: str,
             if fm:
                 field_type = fm.group(1).strip()
                 field_name = fm.group(2).strip()
-                # 过滤常量和序列化字段
+                # Filter constants and serialization fields
                 if field_name.isupper() or field_name == "serialVersionUID":
                     continue
-                # 检查特殊注解
+                # Check special annotations
                 annotations: list[str] = []
-                # 向上看 3 行寻找注解
+                # Look up to 3 lines above for annotations
                 line_idx = text.find(line_stripped)
                 context = text[max(0, line_idx - 200):line_idx]
                 if _JAVA_VERSION_RE.search(context):
@@ -853,12 +853,12 @@ def scan_entity_fields(path: Path, root: Path, text: str, lang_key: str,
                 "file": str(path.relative_to(root)),
                 "class": class_name,
                 "table": table_name,
-                "fields": fields[:50],  # 限制每个实体最多 50 个字段
+                "fields": fields[:50],  # cap 50 fields per entity
             })
 
 
 # ---------------------------------------------------------------------------
-# JSON 字段模式检测（json_field_patterns）
+# JSON field pattern detection (json_field_patterns)
 # ---------------------------------------------------------------------------
 
 _JSON_PARSE_PATTERNS: dict[str, list[tuple[re.Pattern[str], str]]] = {
@@ -866,22 +866,22 @@ _JSON_PARSE_PATTERNS: dict[str, list[tuple[re.Pattern[str], str]]] = {
         (re.compile(r'JSON\.parse(?:Object|Array)\s*\(\s*\w+\.get(\w+)\s*\(\s*\)\s*,\s*(\w+)\.class'), "Fastjson parseObject"),
         (re.compile(r'objectMapper\.readValue\s*\(\s*\w+\.get(\w+)\s*\(\s*\)\s*,\s*(\w+)\.class'), "Jackson readValue"),
         (re.compile(r'typeHandler\s*=\s*JacksonTypeHandler\.class'), "MyBatis-Plus JacksonTypeHandler"),
-        (re.compile(r'@TableField\s*\([^)]*typeHandler\s*=\s*(\w+)TypeHandler'), "自定义 TypeHandler"),
+        (re.compile(r'@TableField\s*\([^)]*typeHandler\s*=\s*(\w+)TypeHandler'), "custom TypeHandler"),
     ],
     "python": [
-        (re.compile(r'json\.loads\s*\(\s*(?:self|instance|obj)\.(\w+)'), "json.loads 字段解析"),
+        (re.compile(r'json\.loads\s*\(\s*(?:self|instance|obj)\.(\w+)'), "json.loads field parse"),
         (re.compile(r'JSONField\s*\('), "Django JSONField"),
     ],
     "typescript_javascript": [
-        (re.compile(r'JSON\.parse\s*\(\s*\w+\.(\w+)'), "JSON.parse 字段解析"),
-        (re.compile(r"type:\s*['\"]jsonb?['\"]"), "TypeORM jsonb 列"),
+        (re.compile(r'JSON\.parse\s*\(\s*\w+\.(\w+)'), "JSON.parse field parse"),
+        (re.compile(r"type:\s*['\"]jsonb?['\"]"), "TypeORM jsonb column"),
     ],
     "go": [
-        (re.compile(r'json\.Unmarshal\s*\(\s*\[\]byte\s*\(\s*\w+\.(\w+)'), "json.Unmarshal 字段"),
+        (re.compile(r'json\.Unmarshal\s*\(\s*\[\]byte\s*\(\s*\w+\.(\w+)'), "json.Unmarshal field"),
         (re.compile(r'`[^`]*gorm:"[^"]*type:jsonb?[^"]*"'), "GORM jsonb tag"),
     ],
     "csharp_dotnet": [
-        (re.compile(r'JsonSerializer\.Deserialize<(\w+)>\s*\(\s*\w+\.(\w+)'), "System.Text.Json 反序列化"),
+        (re.compile(r'JsonSerializer\.Deserialize<(\w+)>\s*\(\s*\w+\.(\w+)'), "System.Text.Json deserialize"),
         (re.compile(r'\[Column\s*\(\s*TypeName\s*=\s*["\']jsonb?["\']'), "EF jsonb Column"),
     ],
 }
@@ -889,7 +889,7 @@ _JSON_PARSE_PATTERNS: dict[str, list[tuple[re.Pattern[str], str]]] = {
 
 def scan_json_field_patterns(path: Path, root: Path, text: str, lang_key: str,
                              results: list[dict[str, Any]]) -> None:
-    """检测 JSON 字段解析模式（String 存 JSON 并反序列化为 DTO 的字段）。"""
+    """Detect JSON field parse patterns (String-stored JSON deserialized to DTO)."""
     if len(results) >= RESULT_LIMIT:
         return
 
@@ -907,16 +907,16 @@ def scan_json_field_patterns(path: Path, root: Path, text: str, lang_key: str,
 
 
 # ---------------------------------------------------------------------------
-# 主流程
+# Main flow
 # ---------------------------------------------------------------------------
 
 def run_scan(root: Path, inventory: dict[str, Any]) -> dict[str, Any]:
     start_time = time.monotonic()
 
-    # 从 inventory 提取语言栈（使用原始语言标签，不是内部 key）
+    # Language stack from inventory (original labels, not internal keys)
     language_stack: list[str] = [item["language"] for item in inventory.get("languages", [])]
 
-    # 确定本次扫描激活的模式族和文件扩展名
+    # Active pattern families and file extensions for this scan
     active_lang_keys: set[str] = set()
     active_exts: set[str] = set()
     for lang in language_stack:
@@ -927,12 +927,12 @@ def run_scan(root: Path, inventory: dict[str, Any]) -> dict[str, Any]:
         if LANG_TO_PATTERN_KEY.get(lang) in active_lang_keys:
             active_exts.add(ext)
 
-    # 如果 inventory 为空（直接运行不带 inventory），扫描所有已知扩展名
+    # If inventory empty (run without inventory), scan all known extensions
     if not active_exts:
         active_exts = set(EXT_TO_LANG.keys())
         active_lang_keys = set(LANG_PATTERNS.keys())
 
-    # language_stack 最终输出用原始标签（不是内部 key）
+    # language_stack output uses original labels (not internal keys)
     if not language_stack:
         language_stack = sorted(
             {lang for lang, key in LANG_TO_PATTERN_KEY.items() if key in active_lang_keys}
@@ -950,7 +950,7 @@ def run_scan(root: Path, inventory: dict[str, Any]) -> dict[str, Any]:
     json_field_patterns: list[dict[str, Any]] = []
 
     for path in files:
-        # 超时保护
+        # Timeout guard
         if time.monotonic() - start_time > TIMEOUT_SECONDS:
             break
 
@@ -993,15 +993,15 @@ def run_scan(root: Path, inventory: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="doc-init 深度知识提取（语言模式扫描）")
-    parser.add_argument("--root", default=".", help="项目根目录")
-    parser.add_argument("--inventory", help="project_inventory.py 输出的 JSON 文件路径；缺省仅按文件扩展名推断")
-    parser.add_argument("--output", help="输出 JSON 文件；缺省打印到 stdout")
+    parser = argparse.ArgumentParser(description="doc-init deep knowledge extraction (language pattern scan)")
+    parser.add_argument("--root", default=".", help="project root")
+    parser.add_argument("--inventory", help="JSON from project_inventory.py; if omitted, infer from extensions only")
+    parser.add_argument("--output", help="output JSON file; default stdout")
     args = parser.parse_args()
 
     root = Path(args.root).expanduser().resolve()
     if not root.exists() or not root.is_dir():
-        print(f"错误：项目根目录不存在或不是目录：{root}")
+        print(f"error: project root does not exist or is not a directory: {root}")
         return 2
 
     inventory: dict[str, Any] = {}
@@ -1011,7 +1011,7 @@ def main() -> int:
             try:
                 inventory = json.loads(inv_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as e:
-                print(f"警告：无法读取 inventory 文件 {inv_path}: {e}，将按文件扩展名推断")
+                print(f"warning: cannot read inventory {inv_path}: {e}; inferring from file extensions")
 
     data = run_scan(root, inventory)
     text = json.dumps(data, ensure_ascii=False, indent=2)

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-# 文档治理只读审计 —— 对应 SKILL.md Step 2。
-# 只读、不改任何文件；自动排除第三方 / 构建产物 / 备份 / git 目录。
-# 用法: audit.py [项目根] [--compact-date YYYY-MM-DD] [--save-metrics 路径] [--compare-metrics 路径]
-#   默认当前目录；一次只审计一个项目。
-#   --compact-date：仅 Step 6 收尾核对压缩账目时传，启用检查 I（逐篇压缩标识硬闸门）；
-#                   Step 2 只读审计阶段不传，跳过该检查。
-#   --save-metrics：把检查 J 的 AGENTS.md 量化指标写入 JSON 基线（Step 2 用）。
-#   --compare-metrics：读基线 JSON，输出压缩前后对比（Step 6 用）；估算 token 上升则标 ⚠。
+# Read-only doc-governance audit — SKILL.md Step 2.
+# Does not modify files; skips third-party / build / backup / git dirs.
+# Usage: audit.py [project-root] [--compact-date YYYY-MM-DD]
+#                  [--save-metrics path] [--compare-metrics path]
+#   Default cwd; one project per run.
+#   --compact-date: Step 6 only — enables check I (per-doc compact stamp gate).
+#                   Omit during Step 2 read-only audit.
+#   --save-metrics: write check J AGENTS.md metrics JSON baseline (Step 2).
+#   --compare-metrics: load baseline JSON, print before/after (Step 6);
+#                      estimated token growth marked ⚠.
 #
-# 退出码不表达成败，结论看输出末尾「小结」三个计数与各节 ❌ 行。
+# Exit code is not pass/fail; read the trailing summary counts and ❌ lines.
 
 import argparse
 import os
@@ -17,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-# ---------- 参数解析 ----------
+# ---------- args ----------
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("proj", nargs="?", default=".")
@@ -36,29 +38,43 @@ DOC_INIT_LINT = DOC_INIT_LINT.resolve()
 try:
     os.chdir(PROJ)
 except OSError:
-    print(f"无法进入目录: {PROJ}", file=sys.stderr)
+    print(f"cannot enter directory: {PROJ}", file=sys.stderr)
     sys.exit(2)
 
-# ---------- 排除目录集合 ----------
+# ---------- prune dirs ----------
 
 PRUNE_NAMES = {
     "node_modules", "target", "build", "dist", "out",
     ".build", ".git", ".claude", ".stversions", "vendor",
+    ".worktrees", "SourcePackages", "DerivedData", ".derivedData",
 }
 
+# Prefixed build dirs: .build-foo, .derivedData-codex, etc. (exact names in PRUNE_NAMES)
+PRUNE_PREFIXES = (".build", ".derivedData")
+
 EXCL_RE = re.compile(
-    r"node_modules|/target/|/build/|/dist/|/out/|/\.build/"
+    r"node_modules|/target/|/build/|/dist/|/out/"
+    r"|/\.build(?:-|/)|/\.derivedData(?:-|/)|/DerivedData/"
+    r"|/\.worktrees/|/SourcePackages/"
     r"|/\.git/|/\.claude/|/\.stversions/|/vendor/"
 )
 
 
 def should_prune(path: Path) -> bool:
-    """判断 path 的任意父级是否是需排除的目录名。"""
-    return any(part in PRUNE_NAMES for part in path.parts)
+    """True if any path component is a pruned dir (incl. .build* / .derivedData*)."""
+    for part in path.parts:
+        if part in PRUNE_NAMES:
+            return True
+        for prefix in PRUNE_PREFIXES:
+            if part == prefix or part.startswith(prefix + "-") or (
+                part.startswith(prefix) and len(part) > len(prefix)
+            ):
+                return True
+    return False
 
 
 def find_md(name_glob: str):
-    """在当前目录下递归查找匹配 name_glob 的 .md 文件，跳过排除目录。"""
+    """Recursively find .md files matching name_glob under cwd, skipping pruned dirs."""
     results = []
     for p in Path(".").rglob(name_glob):
         if p.is_file() and not should_prune(p):
@@ -67,7 +83,7 @@ def find_md(name_glob: str):
 
 
 def find_in_dirs(dirs, name_glob: str, extra_filter=None):
-    """在指定目录列表下递归查找文件。"""
+    """Recursively find files under the given directory list."""
     results = []
     for d in dirs:
         dp = Path(d)
@@ -80,43 +96,43 @@ def find_in_dirs(dirs, name_glob: str, extra_filter=None):
     return results
 
 
-# ---------- 输出 ----------
+# ---------- output ----------
 
-print(f"==== 文档治理审计: {Path('.').resolve()} ====")
+print(f"==== doc-governance audit: {Path('.').resolve()} ====")
 
-# ---------- A. CLAUDE.md 单行 @*.md ----------
+# ---------- A. CLAUDE.md single-line @*.md ----------
 
 print()
-print("## A. CLAUDE.md 是否都只有一行 @*.md（任意 @引用.md 格式均合规）")
+print("## A. CLAUDE.md is a single-line @*.md (any @ref.md form is OK)")
 a = 0
 for c in find_md("CLAUDE.md"):
     content = c.read_text(encoding="utf-8", errors="replace").replace("\n", "").replace("\r", "").replace(" ", "").replace("\t", "")
     if not re.fullmatch(r"@.+\.md", content):
-        print(f"  ❌ 非单行 @*.md: {c}")
+        print(f"  ❌ not single-line @*.md: {c}")
         a += 1
 if a == 0:
-    print("  ✓ 全部合规")
+    print("  ✓ all compliant")
 
-# ---------- B. 悬空 @AGENTS.md ----------
+# ---------- B. dangling @AGENTS.md ----------
 
 print()
-print("## B. 悬空 @AGENTS.md（引入但同级无 AGENTS.md）")
+print("## B. dangling @AGENTS.md (referenced but no sibling AGENTS.md)")
 b = 0
 for c in find_md("CLAUDE.md"):
     text = c.read_text(encoding="utf-8", errors="replace")
     if "@AGENTS.md" in text:
         if not (c.parent / "AGENTS.md").exists():
-            print(f"  ❌ 悬空: {c}")
+            print(f"  ❌ dangling: {c}")
             b += 1
 if b == 0:
-    print("  ✓ 无悬空")
+    print("  ✓ none dangling")
 
-# ---------- C. 旧索引 / 工具注入块残留 ----------
+# ---------- C. legacy index / tool inject-block leftovers ----------
 
 print()
-print("## C. 旧索引 / 工具注入块残留")
+print("## C. legacy index / tool inject-block leftovers")
 
-# 文件引用中出现裸 INDEX.md 或 OVERVIEW.md（前缀不是下划线/大写字母）
+# Bare INDEX.md or OVERVIEW.md refs (prefix is not underscore/uppercase letter)
 bare_index_ref = []
 inject_block = []
 
@@ -124,7 +140,7 @@ bare_re = re.compile(r"(?<![_A-Z])OVERVIEW\.md|(?<![_A-Z])INDEX\.md")
 inject_re = re.compile(r"<!--\s.*:start\s*-->")
 
 for p in find_md("*.md"):
-    if EXCL_RE.search(str(p)):
+    if EXCL_RE.search(str(p)) or should_prune(p):
         continue
     try:
         text = p.read_text(encoding="utf-8", errors="replace")
@@ -132,43 +148,48 @@ for p in find_md("*.md"):
         continue
     if bare_re.search(text):
         bare_index_ref.append(p)
-    if p.name in ("AGENTS.md", "CLAUDE.md") and inject_re.search(text):
+    # managed:inherited-agents is re-injected by sync-agent-files, not leftover — exclude from inject-block
+    if (
+        p.name in ("AGENTS.md", "CLAUDE.md")
+        and inject_re.search(text)
+        and "managed:inherited-agents" not in text
+    ):
         inject_block.append(p)
 
-# 文件名本身是裸 INDEX.md 或 OVERVIEW.md
+# Filename itself is bare INDEX.md or OVERVIEW.md
 bare_file = [p for p in find_md("INDEX.md") if not EXCL_RE.search(str(p))]
 bare_file += [p for p in find_md("OVERVIEW.md") if not EXCL_RE.search(str(p))]
 
 for p in bare_index_ref:
-    print(f"  旧索引引用（裸 INDEX/OVERVIEW）: {p}")
+    print(f"  legacy index ref (bare INDEX/OVERVIEW): {p}")
 for p in bare_file:
-    print(f"  裸索引文件: {p}")
+    print(f"  bare index file: {p}")
 for p in inject_block:
-    print(f"  注入块: {p}")
+    print(f"  inject block: {p}")
 
 if not bare_index_ref and not bare_file and not inject_block:
-    print("  ✓ 无残留（具名 *_INDEX.md 为合法二级索引，已忽略）")
+    print("  ✓ no leftovers (named *_INDEX.md is a valid secondary index, ignored)")
 
-# ---------- D. AGENTS.md 体量 ----------
+# ---------- D. AGENTS.md size ----------
 
 print()
-print("## D. AGENTS.md 体量（> 500 行考虑拆二级索引）")
+print("## D. AGENTS.md size (>500 lines → consider a secondary index)")
 for f in find_md("AGENTS.md"):
     try:
-        # 与 wc -l 行为一致：统计换行符数量，末尾无换行的文件不多计一行
+        # Match wc -l: count newlines; no trailing newline does not add an extra line
         content = f.read_bytes()
         n = content.count(b"\n")
     except OSError:
         n = 0
-    flag = "  ⚠ 超阈值" if n > 500 else ""
-    # wc -l 在 macOS 输出 "     223"（5前导空格），printf "%6s" 不截断，
-    # 结合脚本前导两空格，合计缩进为 "       223"（7空格+数字）
-    print(f"  {n:8d} 行  {f}{flag}")
+    flag = "  ⚠ over threshold" if n > 500 else ""
+    # wc -l on macOS prints "     223" (5 leading spaces); with the script's
+    # two-space prefix the total indent is "       223" (7 spaces + digits)
+    print(f"  {n:8d} lines  {f}{flag}")
 
-# ---------- E. 孤儿文档 ----------
+# ---------- E. orphan docs ----------
 
 print()
-print("## E. 孤儿文档（docs/ 与 specs/ 下，未被 根AGENTS.md ∪ 任意README.md ∪ 任意*_INDEX.md 引用）")
+print("## E. orphan docs (under docs/ and specs/, not referenced by root AGENTS.md ∪ any README.md ∪ any *_INDEX.md)")
 
 idx_texts = []
 if Path("AGENTS.md").exists():
@@ -190,69 +211,86 @@ for f in find_in_dirs(["docs", "specs"], "*.md"):
     if bn.endswith("_INDEX.md"):
         continue
     if bn not in combined_idx:
-        print(f"  ❌ 孤儿: {f}")
+        print(f"  ❌ orphan: {f}")
         e += 1
 if e == 0:
-    print("  ✓ 无孤儿")
+    print("  ✓ no orphans")
 
-# ---------- F. 文件命名合规 ----------
+# ---------- F. filename compliance ----------
 
 print()
-print("## F. 文件命名合规（确定性强的目录）")
+print("## F. filename compliance (high-certainty directories)")
 f_count = 0
 
 date_re = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 review_re = re.compile(r"^.+-review\.md$")
 space_re = re.compile(r" ")
 
-# troubleshooting 下的排查记录（具名 *_INDEX.md / README 合法，跳过）
+# troubleshooting records (named *_INDEX.md / README are allowed, skip)
 for p in find_in_dirs(["."], "*.md",
                       extra_filter=lambda p: "troubleshooting" in p.parts):
     bn = p.name
     if bn == "README.md" or bn.endswith("_INDEX.md"):
         continue
     if not date_re.match(bn):
-        print(f"  ❌ 排查记录应为 YYYY-MM-DD-*.md: {p}")
+        print(f"  ❌ troubleshooting record should be YYYY-MM-DD-*.md: {p}")
         f_count += 1
 
-# reviews 下的 review 台账（具名 *_INDEX.md / README 合法，跳过）
+# review ledgers under reviews/ (named *_INDEX.md / README allowed, skip)
 for p in find_in_dirs(["."], "*.md",
                       extra_filter=lambda p: "reviews" in p.parts):
     bn = p.name
     if bn == "README.md" or bn.endswith("_INDEX.md"):
         continue
     if not review_re.match(bn):
-        print(f"  ❌ review 台账应为 *-review.md: {p}")
+        print(f"  ❌ review ledger should be *-review.md: {p}")
         f_count += 1
 
-# 含空格文件名
+# filenames containing spaces
 for p in find_md("*.md"):
     if " " in p.name:
-        print(f"  ❌ 文件名含空格: {p}")
+        print(f"  ❌ filename contains spaces: {p}")
         f_count += 1
 
 if f_count == 0:
-    print("  ✓ 命名合规")
+    print("  ✓ naming compliant")
 
-# ---------- G. 预置折叠建议 ----------
+# ---------- G. fold suggestions ----------
 
 print()
-print("## G. 预置折叠建议（故障排查 / Review 台账 ≥3 篇但未折叠）")
+print("## G. fold suggestions (troubleshooting / review ledgers ≥3 docs but not folded)")
 g_suggest = 0
 
 ts_files = find_in_dirs(["."], "*.md",
                         extra_filter=lambda p: "troubleshooting" in p.parts and date_re.match(p.name))
 ts_count = len(ts_files)
+# Incident writeups often live under operations/: filename contains incident/fix,
+# or YYYY-MM-DD-*.md under ops dirs (exclude README / *_INDEX); dedupe with
+# troubleshooting/ before applying the type-driven fold threshold.
+ops_incident_re = re.compile(r"(incident|fix)", re.I)
+ops_incident_files = find_in_dirs(
+    ["."],
+    "*.md",
+    extra_filter=lambda p: (
+        "operations" in p.parts
+        and p.name not in {"README.md"}
+        and not p.name.endswith("_INDEX.md")
+        and (ops_incident_re.search(p.name) is not None or date_re.match(p.name))
+    ),
+)
+ops_only = [p for p in ops_incident_files if "troubleshooting" not in p.parts]
+ts_effective = ts_count + len(ops_only)
 ts_idx_list = find_in_dirs(["."], "TROUBLESHOOTING_INDEX.md")
 ts_idx = ts_idx_list[0] if ts_idx_list else None
 
-if ts_count >= 3 and not ts_idx:
-    print(f"  💡 故障排查记录已有 {ts_count} 篇，建议折叠到 docs/troubleshooting/TROUBLESHOOTING_INDEX.md，根 AGENTS.md 留一条强路由（含「何时跳过 / 是否权威源」）")
+if ts_effective >= 3 and not ts_idx:
+    detail = f"troubleshooting naming-compliant {ts_count} + operations incident candidates {len(ops_only)}"
+    print(f"  💡 troubleshooting records total {ts_effective} ({detail}); suggest folding into docs/troubleshooting/TROUBLESHOOTING_INDEX.md (pointer index only — do not relocate operations originals by default); keep one strong route in root AGENTS.md (incl. when to skip / whether authoritative)")
     g_suggest += 1
-elif ts_count >= 3 and ts_idx:
-    print(f"  ✓ 故障排查（{ts_count} 篇）已折叠: {ts_idx}")
+elif ts_effective >= 3 and ts_idx:
+    print(f"  ✓ troubleshooting (total {ts_effective}; troubleshooting={ts_count}, operations incident candidates={len(ops_only)}) already folded: {ts_idx}")
 else:
-    print(f"  ✓ 故障排查（{ts_count} 篇）未达折叠门槛")
+    print(f"  ✓ troubleshooting (total {ts_effective}; troubleshooting={ts_count}, operations incident candidates={len(ops_only)}) below fold threshold")
 
 rv_files = find_in_dirs(["."], "*.md",
                         extra_filter=lambda p: "reviews" in p.parts and review_re.match(p.name))
@@ -261,20 +299,20 @@ rv_idx_list = find_in_dirs(["."], "REVIEW_INDEX.md")
 rv_idx = rv_idx_list[0] if rv_idx_list else None
 
 if rv_count >= 3 and not rv_idx:
-    print(f"  💡 Review 台账已有 {rv_count} 篇，建议折叠到 docs/reviews/REVIEW_INDEX.md，根 AGENTS.md 留一条强路由（含「何时跳过 / 是否权威源」）")
+    print(f"  💡 review ledger has {rv_count} docs; suggest folding into docs/reviews/REVIEW_INDEX.md; keep one strong route in root AGENTS.md (incl. when to skip / whether authoritative)")
     g_suggest += 1
 elif rv_count >= 3 and rv_idx:
-    print(f"  ✓ Review 台账（{rv_count} 篇）已折叠: {rv_idx}")
+    print(f"  ✓ review ledger ({rv_count} docs) already folded: {rv_idx}")
 else:
-    print(f"  ✓ Review 台账（{rv_count} 篇）未达折叠门槛")
+    print(f"  ✓ review ledger ({rv_count} docs) below fold threshold")
 
 if g_suggest == 0:
-    print("  ✓ 无折叠建议")
+    print("  ✓ no fold suggestions")
 
-# ---------- H. doc-init 联动检查 ----------
+# ---------- H. doc-init cross-check ----------
 
 print()
-print("## H. doc-init 联动检查（反向全局引用 / 自我导航残留 / 领域地图状态；与 doc-init 共享同一份检查逻辑，不在本脚本重复实现）")
+print("## H. doc-init cross-check (reverse global refs / self-nav leftovers / domain-map status; shared with doc-init — not reimplemented here)")
 h = 0
 
 if DOC_INIT_LINT.exists():
@@ -293,30 +331,30 @@ if DOC_INIT_LINT.exists():
             continue
         severity, code, path, lineno, msg, proj = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
         if code == "global-ref-in-project-agents":
-            print(f"  ❌ 反向引用全局文件: {path}:{lineno} ({proj}) — {msg}")
+            print(f"  ❌ reverse global-file ref: {path}:{lineno} ({proj}) — {msg}")
             h += 1
         elif code == "self-navigation-in-doc":
-            print(f"  ⚠ docs 内部自我导航残留: {path}:{lineno} ({proj})")
+            print(f"  ⚠ self-navigation leftover inside docs: {path}:{lineno} ({proj})")
             h += 1
 
     if h == 0:
-        print("  ✓ 无反向全局引用 / 自我导航残留")
+        print("  ✓ no reverse global refs / self-nav leftovers")
 
-    print("  doc-init 领域地图状态（若 domain_map_present=True，下方 Step 5 压缩禁止删除/折叠该项目根 AGENTS.md 里的「## 领域地图（doc-init）」与「## 待补充知识库（doc-init backlog）」两段）:")
+    print("  doc-init domain-map status (if domain_map_present=True, Step 5 compression must NOT delete/fold root AGENTS.md sections 「## 领域地图（doc-init）」 and 「## 待补充知识库（doc-init backlog）」):")
     for line in lint_out.splitlines():
         parts = line.split("\t")
         if len(parts) >= 6 and parts[0] == "SUMMARY":
             print(f"    {parts[5]}: {parts[3]}, {parts[4]}")
 else:
-    print(f"  ⏭ 未找到 doc-init（预期路径: {DOC_INIT_LINT}），跳过联动检查，以下三项需人工核对：")
-    print("     - 根 AGENTS.md 是否反向引用了全局指令文件（不应出现 @~/.claude/... 之类）")
-    print("     - docs/ 内部文档是否残留「何时该读/必读」自我导航句")
-    print("     - 根 AGENTS.md 是否存在「## 领域地图（doc-init）」段（存在则该段及 backlog 段禁止在 Step 5 压缩中删除）")
+    print(f"  ⏭ doc-init not found (expected: {DOC_INIT_LINT}); skip cross-check; verify these three manually:")
+    print("     - whether root AGENTS.md reverse-references global instruction files (no @~/.claude/... etc.)")
+    print("     - whether docs/ still contain self-nav phrases like 「何时该读/必读」")
+    print("     - whether root AGENTS.md has 「## 领域地图（doc-init）」 (if so, that section and the backlog section must not be deleted in Step 5 compression)")
 
-# ---------- I. 压缩标识硬闸门 ----------
+# ---------- I. compact-stamp hard gate ----------
 
 print()
-print("## I. 压缩标识硬闸门（对应 SKILL.md Step 5/6 逐篇账目；仅 --compact-date 指定时启用）")
+print("## I. compact-stamp hard gate (SKILL.md Step 5/6 per-doc ledger; only when --compact-date is set)")
 i = 0
 
 if COMPACT_DATE:
@@ -332,26 +370,27 @@ if COMPACT_DATE:
         except OSError:
             continue
         if stamp not in text:
-            print(f"  ❌ 缺本轮压缩标识（{COMPACT_DATE}）: {p}")
+            print(f"  ❌ missing this-round compact stamp ({COMPACT_DATE}): {p}")
             i += 1
     if i == 0:
-        print(f"  ✓ 范围内 docs/specs 文档均带本轮压缩标识（{COMPACT_DATE}）")
+        print(f"  ✓ in-scope docs/specs all have this-round compact stamp ({COMPACT_DATE})")
 else:
     from datetime import date
     today = date.today().strftime("%Y-%m-%d")
-    print(f"  ⏭ 未指定 --compact-date，跳过（Step 2 只读阶段无需；Step 6 收尾用: audit.py <项目根> --compact-date {today}）")
+    print(f"  ⏭ --compact-date not set; skip (not needed in Step 2 read-only; Step 6 finish: audit.py <project-root> --compact-date {today})")
 
-# ---------- J. AGENTS.md 膨胀度量化与托管块（指标口径借鉴 prompt-audit 的 lint） ----------
+# ---------- J. AGENTS.md inflation metrics + managed blocks ----------
 
 print()
-print("## J. AGENTS.md 膨胀度量化与托管块（口径: 字符×0.47 估 token，阈值均为经验值）")
+print("## J. AGENTS.md inflation metrics + managed blocks (chars×0.47 ≈ tokens; thresholds are empirical)")
 
 EMPHASIS_WORDS = ("必须", "一律", "禁止", "务必", "不得")
-TOKEN_COEF = 0.47  # 字符→token 实测系数，来源与自适应选系数逻辑见 plan_shards.py 头注释
+TOKEN_COEF = 0.47  # chars→token; adaptive coef details in plan_shards.py header
 MARKER_RE = re.compile(r"<!--\s*([\w.-]+)\s*:\s*(begin|start|end)(?:\s+[\w.\-/]+)?\s*-->")
 
+
 def agents_md_metrics(path):
-    """单份 AGENTS.md 的量化指标：字符/估算 token/规则条数/强调词密度 + 托管块清单。"""
+    """Metrics for one AGENTS.md: chars/tokens/rules/emphasis + managed blocks."""
     text = path.read_text(encoding="utf-8", errors="replace")
     chars = len(text)
     rules = sum(
@@ -360,9 +399,9 @@ def agents_md_metrics(path):
     )
     emphasis = sum(text.count(w) for w in EMPHASIS_WORDS)
     density = round(emphasis * 1000 / chars, 1) if chars else 0.0
-    # 托管标记块：成对的 <!-- name:begin/end -->；Step 4 索引重建时须原样保留
+    # Paired <!-- name:begin/end --> blocks; Step 4 index rebuild must keep verbatim
     markers = [MARKER_RE.search(line) for line in text.splitlines()]
-    opens, closes, managed = [], set(), []
+    opens, closes = [], set()
     for m in markers:
         if not m:
             continue
@@ -378,6 +417,7 @@ def agents_md_metrics(path):
         "managed_blocks": managed, "unmatched_markers": unmatched,
     }
 
+
 current_metrics = {}
 for f in find_md("AGENTS.md"):
     try:
@@ -386,55 +426,55 @@ for f in find_md("AGENTS.md"):
         continue
 
 if not current_metrics:
-    print("  ⏭ 未找到 AGENTS.md，跳过")
+    print("  ⏭ no AGENTS.md found; skip")
 else:
     for rel, m in current_metrics.items():
-        dens_flag = "  ⚠ 超阈值" if m["density"] > 10 else ""
-        print(f"  {rel}: {m['chars']} 字符 ≈ {m['tokens']} token，规则 {m['rules']} 条，"
-              f"强调词 {m['emphasis']} 次（{m['density']}/千字，阈值 10）{dens_flag}")
+        dens_flag = "  ⚠ over threshold" if m["density"] > 10 else ""
+        print(f"  {rel}: {m['chars']} chars ≈ {m['tokens']} tokens, {m['rules']} rules, "
+              f"emphasis words {m['emphasis']} ({m['density']}/1k chars, threshold 10){dens_flag}")
         if m["managed_blocks"]:
-            print(f"    🔒 托管块（Step 4 索引重建时原样保留，不压不删）: {', '.join(m['managed_blocks'])}")
+            print(f"    🔒 managed blocks (keep verbatim in Step 4 index rebuild; do not compress/delete): {', '.join(m['managed_blocks'])}")
         if m["unmatched_markers"]:
-            print(f"    ❌ 未配对的托管标记（人工检查是否残缺）: {', '.join(m['unmatched_markers'])}")
+            print(f"    ❌ unmatched managed markers (check manually for incomplete pairs): {', '.join(m['unmatched_markers'])}")
 
 if args.save_metrics:
     import json
     Path(args.save_metrics).write_text(
         json.dumps(current_metrics, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"  已保存基线 → {args.save_metrics}（Step 6 对比用: audit.py <项目根> --compare-metrics {args.save_metrics}）")
+    print(f"  saved baseline → {args.save_metrics} (Step 6 compare: audit.py <project-root> --compare-metrics {args.save_metrics})")
 
 if args.compare_metrics:
     import json
     try:
         baseline = json.loads(Path(args.compare_metrics).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        print(f"  ❌ 基线文件不可读（{exc}），跳过对比")
+        print(f"  ❌ baseline unreadable ({exc}); skip compare")
         baseline = None
     if baseline is not None:
-        print("  ---- 与基线对比（Step 2 → 当前）----")
+        print("  ---- compare to baseline (Step 2 → current) ----")
         grew = 0
         for rel, cur in current_metrics.items():
             if rel not in baseline:
-                print(f"  {rel}: 新增（≈ {cur['tokens']} token）")
+                print(f"  {rel}: new (≈ {cur['tokens']} tokens)")
                 continue
             old = baseline[rel]
             delta = cur["tokens"] - old["tokens"]
             arrow = "↑" if delta > 0 else ("↓" if delta < 0 else "=")
-            flag = "  ⚠ 膨胀（应 ≤ 基线，上升需在收工报告说明原因）" if delta > 0 else ""
-            print(f"  {rel}: token {old['tokens']} → {cur['tokens']}（{arrow}{abs(delta)}），"
-                  f"规则 {old['rules']} → {cur['rules']} 条，强调词 {old['density']} → {cur['density']}/千字{flag}")
+            flag = "  ⚠ inflated (should be ≤ baseline; explain growth in finish report)" if delta > 0 else ""
+            print(f"  {rel}: tokens {old['tokens']} → {cur['tokens']} ({arrow}{abs(delta)}), "
+                  f"rules {old['rules']} → {cur['rules']}, emphasis density {old['density']} → {cur['density']}/1k chars{flag}")
             if delta > 0:
                 grew += 1
         for rel in baseline:
             if rel not in current_metrics:
-                print(f"  {rel}: 基线里有、现已不存在")
+                print(f"  {rel}: in baseline, missing now")
         if grew == 0 and current_metrics:
-            print("  ✓ 全部 AGENTS.md 估算 token 未超基线")
+            print("  ✓ all AGENTS.md estimated tokens within baseline")
 
-# ---------- 小结 ----------
+# ---------- summary ----------
 
 print()
 if COMPACT_DATE:
-    print(f"==== 小结: 非规范CLAUDE.md={a} 悬空={b} 孤儿={e} 命名违规={f_count} 压缩缺标识={i}（折叠建议={g_suggest}，doc-init联动={h}，不计成败）====")
+    print(f"==== summary: noncompliant CLAUDE.md={a} dangling={b} orphans={e} naming={f_count} missing compact stamp={i} (fold suggestions={g_suggest}, doc-init cross-check={h}; not pass/fail) ====")
 else:
-    print(f"==== 小结: 非规范CLAUDE.md={a} 悬空={b} 孤儿={e} 命名违规={f_count}（折叠建议={g_suggest}，doc-init联动={h}，压缩标识检查未启用，不计成败）====")
+    print(f"==== summary: noncompliant CLAUDE.md={a} dangling={b} orphans={e} naming={f_count} (fold suggestions={g_suggest}, doc-init cross-check={h}; compact-stamp check off; not pass/fail) ====")

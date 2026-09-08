@@ -1,118 +1,168 @@
 #!/usr/bin/env python3
 """
-将「项目文档管理」规范插入全局 AI 指令文件真身，支持版本检测与自动升级。
+Insert the Project Documentation Management standard into the real global AI
+instruction file, with version detection and automatic upgrade.
 
-用法：python3 insert_doc_governance.py <真身路径>
+Usage: python3 insert_doc_governance.py <real-path>
 
-幂等行为：
-- 若文件已含当前版本 -> 跳过。
-- 若文件含旧版本（或无版本标记的旧章节）-> 自动替换为新版。
-- 若无「项目文档管理」章节 -> 插入。
+Idempotent behavior:
+- If the file already has the current version → skip.
+- If the file has an older version (or an unversioned old section) → replace with the new version.
+- If there is no Project Documentation Management section → insert.
 
-插入位置：文件末尾的 @RTK.md 等 @ 引用行之前；若无则追加到末尾。
+Insert position (priority order):
+1) Before "## 附：外部托管区块" (agentsync canonical Chinese marker)
+2) Before agentsync:begin / external-managed markers
+3) Before the first @ reference line (@RTK.md, etc.)
+4) Append at end of file
 
-版本升级方式：修改 STANDARD 后将 CURRENT_VERSION +1 即可；
-下次 doc-init 运行时会自动检测并升级已部署的旧版本。
-
-版本历史：
-- v8：公司电脑独立演进（强提示规则 + 后果预告示例 + 量化折叠阈值），2026-08-13 推 GitHub。
-- v9：家庭侧独立演进（强弱提示审计版），未推 GitHub。
-- v10：2026-08-19 融合两线：以 v9 已部署的压缩态为底稿（含 v8 的量化折叠与强提示规则、
-  v9 的 _standards/workspace-docs 覆盖范围），合入 v8 的后果预告示例；收工复盘条目内置
-  「结论产生即落盘」第一触发点，模板自含、不依赖外部章节。
-- v11：2026-08-20 用 prompt-audit 方法论自治理：登记规则三处归一（§2 立法/§4 删迁/§7 查账）、
-  目录树 11 行压 1 行、双示例压单例、强度规则四弹合一、收工复盘去口语化；
-  2096→1799 字符，语义逐项核对无损。
-- v12：2026-08-20 去后果预告 + 导航两级强度：导航默认写内容/作用描述供模型自主判断，
-  关键场景加「在 X 前必读」硬约束兑底；不写「不读的后果」——后果预告给模型开了权衡窗口
-  （后果可接受 → 不读），反而稀释必读的无条件性。
+Version upgrades: after changing STANDARD, bump CURRENT_VERSION by 1;
+the next doc-init run will detect and upgrade already-deployed older versions.
 """
 
 import sys
 import re
 
-CURRENT_VERSION = 12
+CURRENT_VERSION = 15
 
-STANDARD = f"""## 项目文档管理
+# Heading used in the injectable STANDARD (English for open-source inject).
+SECTION_TITLE = "Project Documentation Management"
+# Legacy Chinese heading still present in older deployments; must be removable on upgrade.
+LEGACY_SECTION_TITLE = "项目文档管理"
+
+STANDARD = f"""## {SECTION_TITLE}
 <!-- doc-governance-version: {CURRENT_VERSION} -->
 
-### 1. 核心规则
+### 1. Core rules
 
-* 根 `AGENTS.md` 是项目文档唯一一级入口；长期文档须能从根一跳或两跳找到。
-* 涉及业务规则、架构、故障、跨模块或不熟悉领域时，先检索相关项目文档再动手。
-* **评审/审视/分析类**：相关规范是评判基准，须先读完再下结论；不得因代码未用某技术就跳过——评审要发现「该用却没用」。
-* 禁止用内置记忆功能；需持久化的知识写入项目文档。
-* 除 `README.md` 外，项目文档默认中文。
-* 项目根 `CLAUDE.md` 默认仅一行：`@AGENTS.md`
-* 新建/首次接手：若全局指令声明了跨项目技术规范位置，按主语言查找匹配文档并在根 `AGENTS.md` 顶部引用（未声明则跳过）。
+* Root `AGENTS.md` is the project's only top-level documentation entry; long-lived docs must be reachable in one or two hops from root `AGENTS.md`.
+* Project-root `CLAUDE.md` must default to a single line: `@AGENTS.md`
+* When creating or first taking over a project, check whether the global AI instruction file declares where cross-project tech standard docs live; if declared, look up matching docs by the project's primary language/stack and add a reference at the top of project-root `AGENTS.md` (if undeclared, skip—do not invent paths).
+* **This managed block owns only documentation structure and governance** (entry points, navigation, indexes, single source of truth, what belongs in docs, end-of-task doc checks). **It does not own:** comment/log language, disabling memory, reading standards before review, how to speak to the user, search-before-acting, or other Agent behavior—those live only in global-instruction **non-managed** sections; do not re-introduce them into this block or doc-* skills as a global source of truth. Boundary details: global `docs/SKILLS_GUIDE.md`.
 
-### 2. 文档导航
+### 2. Documentation navigation
 
-项目根 `AGENTS.md` 须含「文档导航」，登记全部长期文档。
+Project-root `AGENTS.md` must contain a 「Documentation navigation」 section that registers every long-lived doc in the project.
 
-* 每条一行：路径 + 内容/作用描述（供模型自主判断是否读）；关键场景追加「在 X 前必读」硬约束提升触发率。
-* 触发按「任务类型 / 业务领域」门控，不要按「代码是否已用到某技术」——后者会让评审漏掉「该用却没用」。
-* **强度须匹配文档价值**：有代价/硬约束/踩坑的文档写「**必读**」，其余不加强调词；禁止弱提示（「涉及 X 前读」「先阅读」）、禁止批量弱导语包列表、同一文档多处引用不得降级（根写「必读」，子指针不许弱化为「前读」）。索引可达 ≠ 会被读取。不写「不读的后果」——后果预告等于告诉模型可以权衡后果决定读不读，反而稀释「必读」的无条件性。
-* 强度规则覆盖一切实际入口：项目根导航、`_standards/*.md`、`workspace-docs/*/README.md`、全局指令导航。
-* 新写文档立即登记并反向核对，禁止待办占位；指针尽量就近贴在支撑的那条规则旁，底部导航作兜底全集。
+Navigation rules:
 
-示例：
+* One navigation line per doc, with path and purpose.
+* Purpose must be written as 「when to read」, covering all task types for that domain (change / create / review / troubleshoot)—not merely 「what it is」.
+* Trigger conditions by 「task type / business domain」 (e.g. 「when changing/reviewing module X」), not by 「whether code already uses a concrete technology」 (e.g. 「when involving Liquid Glass」)—the latter fails for review tasks: the code under review may not use that technology yet, so the model skips as 「condition unmet」 and misses exactly the 「should use but does not」 finding.
+* **Navigation importance strength must match the doc's real value:** truly must-read docs (costly, hard constraints, recorded pitfalls) must be written as 「**must read** + consequence preview」 in nav / nearby pointers—not weak hints (「read before involving X」「read first」「when reading」). Agents scanning normative docs sort by format weight; weak sentences are skipped. Index reachability ≠ will be read. (2026-08 Harbor client coordinate offset: GCJ-02 docs existed, but only 「read before involving location/maps」—Agent skipped and re-hit the pitfall.)
+* **When the same doc is referenced in multiple places, strength must not be mutually downgraded:** if root `AGENTS.md` says 「must read」, a subproject or nearby pointer must not weaken it to 「read before / read first」—when strengths conflict, Agents follow the weaker one (2026-08 full-repo audit: LingoWeave product KB 「must read」 at root vs 「read before」 on the client side; SharedPlatform same doc with inconsistent strength).
+* **Forbidden: wrapping a doc list in a batch weak lead-in:** e.g. 「Read the following docs first when involving the matching domain」 then a list of KBs—the lead-in itself is the weakest hint and the whole list gets skipped. Every must-read doc must independently say 「**must read** + consequence」; do not uniformly weaken via a lead-in sentence (2026-08 audit: JotBox/Curio backend KB lists; Outbox idempotency and state-machine hard constraints all weakened).
+* **Strength rules are not limited to project-root `AGENTS.md` nav:** cross-product standards (`_standards/*.md`), `workspace-docs/*/README.md` secondary indexes, and global-instruction-file navigation follow the same strength rules—these files are the real entry for Agents across projects; index entries must also carry 「when to read + must read + consequence」 (2026-08 audit: swift/go/frontend standards still used weak 「see」「pitfalls in」 wording; java.md and 12 java-docs runbooks had no index entry despite hard constraints).
+* **Register new docs immediately, then reverse-check; no todo placeholders:** after writing a `docs/` doc, sync it into nav; after registering, reverse-scan `docs/` for misses; do not leave 「should add? / register after implement」 placeholders (2026-08 audit: AlphaForge strategy/backtest architecture docs existed unregistered with only 「should add?」 in AGENTS.md; Infrastructure observability README had hard pitfalls with zero registration).
+* Prefer placing doc pointers next to the rule they support, not only in a bottom navigation table.
+
+Examples:
 
 ```md
-- `docs/BILLING_KNOWLEDGE_BASE.md`：订阅/支付/额度扣减/账单状态流转的领域知识与状态机。改、评审或排查相关模块前必读。
+- `docs/BILLING_KNOWLEDGE_BASE.md`: must read before changing, reviewing, or troubleshooting subscription, payment, quota deduction, or bill status flows.
+- `docs/AUTH_PERMISSION_GUIDE.md`: must read before developing, reviewing, or changing user login / permission control.
 ```
 
-`docs/` 布局惯例：`*_KNOWLEDGE_BASE.md`（领域知识库）、`*_GUIDE.md`（指南）、`design/`、`troubleshooting/`。
+```text
+<project-root>/
+├── AGENTS.md
+├── CLAUDE.md
+└── docs/
+    ├── *_KNOWLEDGE_BASE.md (domain knowledge bases)
+    ├── *_GUIDE.md (domain guides)
+    ├── ...
+    ├── design/
+    ├── troubleshooting/
+    └── ...
+```
 
-### 3. 二级索引
+### 3. Secondary indexes
 
-默认不建；能平铺就不折。当导航占根文过半，或排查/Review 台账 ≥3 篇时折叠到具名 `<DOMAIN>_INDEX.md`；根只留强路由（含「何时跳过 / 是否权威源」）；禁止三级以上索引。
+Do not create secondary indexes by default; prefer root `AGENTS.md` navigating directly to concrete docs.
 
-### 4. 文档变更
+Only when a class of docs is so large that flattening harms root `AGENTS.md` readability, create a secondary index, e.g.:
 
-* 迁移或重命名：搜全仓引用并同步更新；删除文档同步清导航。
-* 新增长期文档类型：在根说明用途、位置与进入路径。
+```text
+- `docs/troubleshooting/TROUBLESHOOTING_INDEX.md`: must read before troubleshooting any fault / error / abnormal behavior—check for prior similar cases first
+- `docs/reviews/REVIEW_INDEX.md`: must read before reviewing or largely changing a module: read historical review conclusions and residual risks first
+```
 
-### 5. 单一来源
+After creating a secondary index, root `AGENTS.md` keeps only the index entry; details sink into the secondary index. No tertiary-or-deeper index chains.
 
-* 一概念/规则/机制只维护一个权威源；他处相对路径链接，不复制。
-* 权威结论或主称谓更新后，所有旧叫法引用须同步改正；当场定不了则标「待确认」。
+### 4. Documentation changes
 
-### 6. 什么该记录
+* New docs: register in root `AGENTS.md` at the same time.
+* Deleted docs: remove the nav entry from root `AGENTS.md` at the same time.
+* Migrated or renamed docs: search the whole repo for references and update them.
+* New long-lived doc types: explain purpose, location, and entry path in root `AGENTS.md` at the same time.
 
-应记：项目级行为规范与强制流程；业务规则/架构/领域知识；代码变动导致的设计与配置变化；可复用故障路径；Review 长期结论与约束。
+### 5. Single source of truth
 
-不应记：代码已清楚表达的信息；git log/blame 能查到的历史；一次性现象；仅当前会话有用的信息；已在他处记录的规则。
+* One concept, rule, or mechanism has one authoritative source.
+* Other docs that need it use relative-path links—do not copy-paste.
+* Once an authoritative conclusion or canonical term is confirmed and updated, every doc citing the old conclusion / old name must be corrected in sync; two docs must never contradict each other on the same fact at any moment. If you cannot decide which is right on the spot, return to authoritative sources (product / requirements / code); if still undecided, mark 「pending confirmation」—do not leave contradictions.
 
-### 7. 收工前检查
+### 6. What to record
 
-* 承诺文档是否完成；新增是否已登记；删迁后旧引用是否清理；新规则/机制/踩坑是否落盘。
-* 向用户按路径列出新增/修改/删除及一句话说明；无改动须明确「本次未修改文档」。
+Should record:
 
-| 信息类型 | 目标位置 |
+* Project-level behavior norms, constraints, mandatory processes.
+* Project business rules, architecture mechanisms, domain knowledge.
+* Design, process, and config explanations that change because code changed.
+* Reusable failure causes, troubleshooting paths, and fixes.
+* Long-lived conclusions, risk points, and follow-up constraints from reviews.
+
+Should not record:
+
+* Information already clearly expressed by the code itself.
+* History available via `git log` / `git blame`.
+* One-off phenomena.
+* Information useful only for the current session and not reusable later.
+* Rules already recorded elsewhere.
+
+When to persist user product intent or investigation conclusions, whether to call `doc-update`, and when to promote cross-project findings to global docs—follow global-instruction **non-managed** sections such as 「Conclusions and product-intent persistence」; this block does not re-legislate them.
+
+### 7. End-of-task documentation check
+
+Before ending a task, check:
+
+* Promised docs are finished.
+* New docs are registered in root `AGENTS.md`.
+* After delete / migrate / rename, old references are cleaned.
+* List added / modified / deleted docs by path for the user with a one-line note each; if nothing changed, say clearly 「No documentation changes this time」.
+
+| Information type | Target location |
 |---|---|
-| 跨项目通用模式 / 检查清单 / 脚本 | 对应 skill 文件 |
-| 项目级行为规范 / 约束 / 强制流程 | 项目根 `AGENTS.md` |
-| 项目业务规则 / 架构 / 领域知识 / 代码变动导致文档失效 | `docs/` 中的文档 |
+| Cross-project reusable patterns / checklists / scripts | Corresponding skill files |
+| Project-level behavior norms / constraints / mandatory processes | Project-root `AGENTS.md` |
+| Project business rules / architecture / domain knowledge / docs invalidated by code changes | Docs under `docs/` |
 
-**收工复盘（兜底）**：本会话有可复用发现或代码变动导致文档失效时，**必须调用 `doc-update` skill**；判定无需更新则按其「本次无需更新」收工。落盘不等收工：花搜索/调查/试错换来的可复用结论（根因+解法、选型裁定、工具行为变化等），拿到即记，未验证的标「待用户确认」。本条只接漏网之鱼。
+Where global docs land and end-of-task discipline such as 「must call doc-update」 → see global non-managed 「Conclusions and product-intent persistence / Pre-finish reflection」; do not repeat here.
 """
 
 VERSION_RE = re.compile(r"<!--\s*doc-governance-version:\s*(\d+)\s*-->")
-SECTION_RE = re.compile(r"(^|\n)(## 项目文档管理\b.*?)(?=\n## |\Z)", re.S)
+# Match English or legacy Chinese section titles for upgrade/removal.
+SECTION_HEADING_RE = re.compile(
+    rf"(^|\n)(## (?:{re.escape(SECTION_TITLE)}|{re.escape(LEGACY_SECTION_TITLE)})\b.*?)(?=\n## |\Z)",
+    re.S,
+)
 
 
 def _get_installed_version(content: str) -> int | None:
-    """返回文件中已安装的版本号，无版本标记时返回 None。"""
+    """Return the installed version number, or None if unmarked."""
     m = VERSION_RE.search(content)
     return int(m.group(1)) if m else None
 
 
+def _has_section(content: str) -> bool:
+    return f"## {SECTION_TITLE}" in content or f"## {LEGACY_SECTION_TITLE}" in content
+
+
 def _remove_section(content: str) -> str:
-    """删除现有的「项目文档管理」章节（含内容直到下一个同级 ## 标题或文件末尾）。"""
-    # 匹配从 ## 项目文档管理 到下一个 ## 同级标题（或文件末尾）
+    """Remove an existing Project Documentation Management section (English or legacy Chinese)."""
     pattern = re.compile(
-        r"\n## 项目文档管理\b.*?(?=\n## |\Z)", re.S
+        rf"\n## (?:{re.escape(SECTION_TITLE)}|{re.escape(LEGACY_SECTION_TITLE)})\b.*?(?=\n## |\Z)",
+        re.S,
     )
     return pattern.sub("", content)
 
@@ -124,36 +174,55 @@ def insert(path: str) -> None:
     installed = _get_installed_version(content)
 
     if installed is not None and installed >= CURRENT_VERSION:
-        print(f"[跳过] 「项目文档管理」已是最新版本（v{installed}）：{path}")
+        print(f"[skip] {SECTION_TITLE} already latest (v{installed}): {path}")
         return
 
-    if "## 项目文档管理" in content:
+    if _has_section(content):
         if installed is None:
-            print(f"[升级] 检测到无版本标记的旧章节，替换为 v{CURRENT_VERSION}：{path}")
+            print(
+                f"[upgrade] Unversioned old section detected; replacing with v{CURRENT_VERSION}: {path}"
+            )
         else:
-            print(f"[升级] v{installed} -> v{CURRENT_VERSION}：{path}")
+            print(f"[upgrade] v{installed} → v{CURRENT_VERSION}: {path}")
         content = _remove_section(content)
     else:
-        print(f"[新增] 插入「项目文档管理」v{CURRENT_VERSION}：{path}")
+        print(f"[added] Inserting {SECTION_TITLE} v{CURRENT_VERSION}: {path}")
 
-    # 找插入点：第一个以 @ 开头的行（@RTK.md 等引用）之前
-    m = re.search(r"\n(@\S+.*)", content)
-    if m:
-        insert_pos = m.start()
+    # Insert position (priority order):
+    # 1) Before "## 附：外部托管区块" (agentsync canonical Chinese marker)
+    # 2) Before agentsync:begin / external-managed markers
+    # 3) Before the first @ reference line (@RTK.md, etc.)
+    # 4) End of file
+    insert_pos = None
+    for pat in (
+        r"\n## 附：外部托管区块\b",
+        r"\n<!--\s*agentsync:begin",
+        r"\n(@\S+.*)",
+    ):
+        m = re.search(pat, content)
+        if m:
+            insert_pos = m.start()
+            break
+    if insert_pos is not None:
         before = content[:insert_pos]
         after = content[insert_pos:]
-        new_content = before.rstrip("\n") + "\n\n" + STANDARD.rstrip("\n") + "\n\n" + after.lstrip("\n")
+        new_content = (
+            before.rstrip("\n") + "\n\n" + STANDARD.rstrip("\n") + "\n\n" + after.lstrip("\n")
+        )
     else:
         new_content = content.rstrip("\n") + "\n\n" + STANDARD.rstrip("\n") + "\n"
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(new_content)
 
-    print(f"[完成] 写入成功：{path}")
+    print(f"[done] Wrote successfully: {path}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print(f"用法：python3 {sys.argv[0]} <AI 指令文件真身路径>", file=sys.stderr)
+        print(
+            f"Usage: python3 {sys.argv[0]} <real path of AI instruction file>",
+            file=sys.stderr,
+        )
         sys.exit(1)
     insert(sys.argv[1])

@@ -1,181 +1,181 @@
 # Sub-agent Deep-Write Prompt Template
 
-本文定义主 Agent 派遣 sub-agent 执行深写时的 prompt 结构和输入规范。深写质量的上限不由 sub-agent 的能力决定，而由主 Agent 给出的 prompt 质量决定——信息越结构化、信号越具体，sub-agent 越不需要重复探索，产出越深。
+This document defines the prompt structure and input contract when the main Agent dispatches sub-agents for deep-write. Deep-write quality is capped by prompt quality from the main Agent—not by sub-agent capability. More structured information and concrete signals mean less re-exploration and deeper output.
 
 ---
 
-## 核心原则
+## Core principles
 
-1. **禁止重复探索**：主 Agent 在 Step 8 已完成项目级扫描（inventory + depth_scanner + git_history + 数据库 catalog），sub-agent 不应重新 grep 已知入口。prompt 必须把已知信号直接传递，sub-agent 只做**确认性阅读**（验证信号是否真实）和**增量发现**（找到主 Agent 未覆盖的细节）。
-2. **输入决定深度**：sub-agent 的产出深度 = prompt 中给出的具体信号数量。只说"深写支付域"产出骨架级；给出 5 个状态枚举 + 3 个并发模式 + 入口文件列表产出可用级。
-3. **约束决定一致性**：多个 sub-agent 并行时，主称谓、文件名规范、质量闸门标准必须在 prompt 中统一下发，否则各自为政。
+1. **No re-exploration:** The main Agent finished project-level scanning in Step 8 (inventory + depth_scanner + git_history + DB catalog). Sub-agents must not re-grep known entries. The prompt must pass known signals directly; sub-agents only do **confirming reads** (verify signals are real) and **incremental discovery** (details the main Agent missed).
+2. **Input determines depth:** Sub-agent output depth ≈ number of concrete signals in the prompt. “Deep-write the payment domain” yields skeleton docs; five status enums + three concurrency patterns + entry file lists yield usable docs.
+3. **Constraints determine consistency:** When multiple sub-agents run in parallel, canonical terms, filename conventions, and quality-gate standards must be issued uniformly in the prompt—or each will diverge.
 
 ---
 
-## Prompt 结构模板
+## Prompt structure template
 
-sub-agent prompt 应按以下结构组织（按序号排列，每项必须存在或显式标注"无"）：
+Organize the sub-agent prompt as follows (in order; every item must exist or be explicitly marked “none”):
 
-### 1. 任务定义
-
-```
-你是 doc-init 的深写 Worker。你的任务是为「{域名}」业务域生成一份完整的领域知识库文档。
-
-输出文件：`docs/{DOMAIN}_KNOWLEDGE_BASE.md`
-模板规范：按 doc-init 的 KB 模板（§1-§9）生成，每个 section 不允许为空。
-```
-
-### 2. 域业务范围
+### 1. Task definition
 
 ```
-业务范围：{一句话定义}
-包含：{覆盖的功能点列表}
-不包含：{明确排除的功能点}
+You are a doc-init deep-write Worker. Your task is to produce a complete domain knowledge-base document for the「{domain name}」business domain.
+
+Output file: `docs/{DOMAIN}_KNOWLEDGE_BASE.md`
+Template: follow the doc-init KB template (§1–§9); no section may be empty.
 ```
 
-**为什么需要「不包含」**：多域并行时，边界不清会导致两个 sub-agent 写重复内容或互相遗漏。
-
-### 3. 已知入口清单
-
-主 Agent 从 Step 8 inventory + 手动探索中已确定的文件路径列表：
+### 2. Domain business scope
 
 ```
-已知入口（无需重新搜索，直接读取确认）：
+Business scope: {one-sentence definition}
+Includes: {list of covered capabilities}
+Excludes: {explicitly excluded capabilities}
+```
+
+**Why “Excludes” matters:** With parallel domains, unclear boundaries cause two sub-agents to duplicate content or both miss pieces.
+
+### 3. Known entry inventory
+
+File paths already determined by the main Agent from Step 8 inventory + manual exploration:
+
+```
+Known entries (do not re-search; read to confirm):
 
 Controller:
-- {文件绝对路径} — {职责}
+- {absolute file path} — {responsibility}
 - ...
 
-Service/核心类:
-- {文件路径} — {职责}
+Service/core classes:
+- {file path} — {responsibility}
 - ...
 
 Entity/Model:
-- {文件路径} — {主表名}
+- {file path} — {main table name}
 - ...
 
 Repository/Mapper:
-- {文件路径}
+- {file path}
 - ...
 ```
 
-### 4. Depth Scanner 信号
+### 4. Depth Scanner signals
 
-从 `.doc-init-depth-scan.json` 中按域过滤出的信号：
-
-```
-已识别信号（需你阅读代码确认真实性，确认后写入对应 section）：
-
-状态枚举（→ §2）：
-- {枚举类路径}: {枚举值列表摘要}
-
-并发控制（→ §6 AI 易错点）：
-- {文件:行号}: {模式描述，如 "@Version 乐观锁"}
-
-幂等机制（→ §6）：
-- {文件:行号}: {幂等 key 来源描述}
-
-事件/MQ（→ §5）：
-- {publisher 文件} → {topic/event} → {consumer 文件}
-
-JSON 字段（→ §6 格式规范）：
-- {实体.字段}: 反序列化目标 {DTO 类}
-
-热点文件（→ §7 标注）：
-- {文件路径}: {最近 N 次修改集中在此}
-```
-
-**处理规则**：信号是候选，不是定论。读代码确认后写入正文；确认为误报则丢弃并在 §9 说明。
-
-### 5. 主称谓表
+Signals filtered by domain from `.doc-init-depth-scan.json`:
 
 ```
-领域语言（正文必须使用主称谓，实现名只在首次出现和入口索引中括号补充）：
+Identified signals (read code to confirm; then write into the matching section):
 
-| 业务概念 | 主称谓 | 实现别名（代码/表/接口） |
+Status enums (→ §2):
+- {enum class path}: {summary of enum values}
+
+Concurrency control (→ §6 AI pitfalls):
+- {file:line}: {pattern description, e.g. "@Version optimistic lock"}
+
+Idempotency (→ §6):
+- {file:line}: {idempotency key source description}
+
+Events/MQ (→ §5):
+- {publisher file} → {topic/event} → {consumer file}
+
+JSON fields (→ §6 format rules):
+- {entity.field}: deserialize target {DTO class}
+
+Hot files (→ §7 annotation):
+- {file path}: {recent N changes concentrated here}
+```
+
+**Handling rule:** Signals are candidates, not conclusions. After confirming in code, write into body text; if false positive, discard and explain in §9.
+
+### 5. Canonical-term table
+
+```
+Domain language (body text must use canonical terms; implementation names only in parentheses at first appearance and in entry indexes):
+
+| Business concept | Canonical term | Implementation aliases (code/table/API) |
 |---------|--------|------------------------|
-| {概念} | {主称谓} | {类名, 表名, 字段名} |
+| {concept} | {canonical} | {class, table, field} |
 ```
 
-### 6. 用户 Q&A 结果（如有）
+### 6. User Q&A results (if any)
 
 ```
-用户补充信息（高权重，直接采信）：
-- {Q&A 问答对}
+User supplements (high weight; trust directly):
+- {Q&A pairs}
 - ...
 
-若无用户 Q&A，在 §9 标注「缺少用户经验输入」。
+If no user Q&A, mark in §9: “Missing user experience input”.
 ```
 
-### 7. 关联域已知接口
+### 7. Known interfaces of related domains
 
 ```
-关联域信息（写入 §8 关联文档 + §6 跨域约束）：
-- {域A} 通过 {接口/MQ/事件} 与本域交互：{交互描述}
-- 公共 Guide 候选：{机制名} — {涉及的域列表}
+Related-domain info (write into §8 related docs + §6 cross-domain constraints):
+- {Domain A} interacts with this domain via {API/MQ/event}: {interaction description}
+- Shared Guide candidates: {mechanism name} — {list of involved domains}
 ```
 
-### 8. 质量闸门
+### 8. Quality gates
 
 ```
-质量底线（不满足则必须回补，不能标"待补充"收工）：
+Quality floor (must backfill if unmet; do not ship as “to be filled”):
 
-- §2 核心流程/状态机：必须有真实枚举值（code + 含义）+ 状态转移图（ASCII 或列表）
-- §3 代码入口索引：必须精确到文件名（不能只写包名），至少覆盖 Controller + 核心 Service + Repository
-- §4 表与字段入口：主表必须逐字段列出（类型 + 业务语义 + 改动注意）
-- §6 隐性约束：至少 5 条，每条必须有代码证据（文件名:行号 或代码片段）；AI 易错点必须标注
-- §7 验证路径：至少 3 条可执行的验证命令（SQL/curl/grep），含真实的表名/接口路径/字段名
+- §2 Core flows/state machines: real enum values (code + meaning) + state-transition diagram (ASCII or list)
+- §3 Code entry index: precise to filenames (not package names only); at least Controller + core Service + Repository
+- §4 Table/field entries: main table must list fields one by one (type + business meaning + change notes)
+- §6 Hidden constraints: at least 5 items, each with code evidence (filename:line or snippet); AI pitfalls must be tagged
+- §7 Validation paths: at least 3 executable validation commands (SQL/curl/grep) with real table names / API paths / field names
 ```
 
-### 9. 约束与禁止行为
+### 9. Constraints and forbidden behavior
 
 ```
-硬约束：
-- 只创建/修改 `docs/{DOMAIN}_KNOWLEDGE_BASE.md` 一个文件
-- 不修改 AGENTS.md、不修改其他域的 KB、不修改/创建公共 Guide
-- 代码路径必须精确到文件名，不能只写包名或目录
-- 隐性约束必须有行号或代码片段佐证，不能只写"据推断"
-- 不伪造踩坑经验或线上故障
-- 所有代码注释使用中文
-```
-
----
-
-## 示例：主 Agent 组装 prompt 的伪代码
-
-```
-对每个深写域 D:
-  1. 从知识边界报告中提取 D 的业务范围、入口清单
-  2. 从 .doc-init-depth-scan.json 中 filter(domain == D) 得到信号列表
-  3. 从 Step 8 领域语言归一化结果中取 D 的主称谓表
-  4. 从 Step 9 Q&A 中取与 D 相关的问答对
-  5. 从其他域的边界报告中提取与 D 有交互的接口
-  6. 用上述模板组装完整 prompt
-  7. 派遣 sub-agent(prompt)（默认继承父模型，勿额外指定 model）
+Hard constraints:
+- Create/modify only `docs/{DOMAIN}_KNOWLEDGE_BASE.md`
+- Do not modify AGENTS.md, other domains’ KBs, or shared Guides
+- Code paths must be precise to filenames—not package or directory only
+- Hidden constraints must cite line numbers or snippets—not “inferred”
+- Do not fabricate pitfalls or production incidents
+- Comment/log language follows the global AGENTS “Coding” section; this template does not set a separate language default
 ```
 
 ---
 
-## 深写回合制（sub-agent 内部执行）
+## Example: main Agent assembling the prompt (pseudocode)
 
-每个 sub-agent 的深写分 3 个回合：
+```
+For each deep-write domain D:
+  1. Extract D’s business scope and entry inventory from the knowledge-boundary report
+  2. filter(domain == D) from .doc-init-depth-scan.json → signal list
+  3. Take D’s canonical-term table from Step 8 domain-language normalization
+  4. Take Q&A pairs related to D from Step 9
+  5. Extract interfaces that interact with D from other domains’ boundary reports
+  6. Assemble the full prompt from the template above
+  7. Dispatch sub-agent(prompt, model="sonnet")
+```
 
-| 回合 | 目标 | 行为 |
+---
+
+## Deep-write rounds (inside each sub-agent)
+
+Each sub-agent deep-write has 3 rounds:
+
+| Round | Goal | Behavior |
 |------|------|------|
-| 1 | 骨架 | 基于 prompt 中的入口清单和信号，读取代码建立 §1-§5 骨架 |
-| 2 | 深层 | 追踪 §2 状态转换的前置条件、§6 隐性约束的代码证据、§5 的完整事件链路 |
-| 3 | 闸门自检 | 对照质量闸门逐项检查，不满足的回补；检查完成后输出最终文件 |
+| 1 | Skeleton | From entry inventory and signals in the prompt, read code and build §1–§5 skeleton |
+| 2 | Depth | Trace §2 transition preconditions, code evidence for §6 hidden constraints, full §5 event chains |
+| 3 | Gate self-check | Check quality gates item by item; backfill unmet ones; then output the final file |
 
 ---
 
-## 产出规范
+## Output acceptance
 
-sub-agent 完成后，主 Agent 应检查：
+After a sub-agent finishes, the main Agent should check:
 
-| 检查项 | 不通过的处理 |
+| Check | If failed |
 |--------|-------------|
-| §2 有真实枚举值 | 主 Agent 补充（grep 枚举类） |
-| §6 ≥ 5 条且有代码证据 | 打回 sub-agent 或主 Agent 补充 |
-| §7 非空且含真实路径 | 主 Agent 从 Controller 路径推导补充 |
-| 文件名/主称谓与其他域一致 | 主 Agent 统一修正 |
-| 无跨域内容入侵 | 主 Agent 移除越界内容 |
+| §2 has real enum values | Main Agent supplements (grep enum classes) |
+| §6 ≥ 5 items with code evidence | Send back to sub-agent or main Agent supplements |
+| §7 non-empty with real paths | Main Agent derives from Controller paths |
+| Filenames / canonical terms aligned with other domains | Main Agent unifies |
+| No cross-domain content intrusion | Main Agent removes out-of-scope content |

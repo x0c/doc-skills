@@ -1,85 +1,85 @@
 # Operations Validation
 
-本文定义运行验证回路和 `OPERATIONS_GUIDE.md` 的条件生成规则。只有项目有本地运行、启动、验证或排障价值时读取本文件。
+This document defines the runtime validation loop and conditional generation rules for `OPERATIONS_GUIDE.md`. Read it only when the project has local run / start / validate / troubleshoot value.
 
-## 核心原则
+## Core principles
 
-`OPERATIONS_GUIDE.md` 不是项目百科，也不是业务接口索引；它是 Agent 的本地启动、环境配置、服务存活和通用验证仪表盘。
+`OPERATIONS_GUIDE.md` is not a project encyclopedia or business API index; it is the Agent’s local dashboard for start-up, environment config, service liveness, and generic validation.
 
-静态扫描只能生成运行假设，不能伪造成运维经验。只把实际执行过的编译、启动、探活、最小请求、日志排障和修正路径写成高置信内容；未执行或执行失败但未闭环的内容必须标为「待验证 / 低置信度 / 阻塞项」。
+Static scans can only produce runtime hypotheses—never forge them as ops experience. Write only actually executed compile / start / health / minimal request / log troubleshooting and fix paths as high-confidence content; anything not executed or failed without closure must be marked “pending validation / low confidence / blocker”.
 
-运行时不只是运维文档来源。运行起来后看到的业务接口、真实 SQL、状态变化、权限、缓存、MQ、错误码和链路副作用，应进入领域 KB 或公共 Guide；Operations 只记录启动、配置、探活、日志路径、环境阻碍和通用验证套路。
+Runtime is more than an ops-doc source. Business APIs, real SQL, state changes, permissions, cache, MQ, error codes, and chain side effects seen after start belong in domain KBs or shared Guides; Operations only records start, config, health, log paths, environment blockers, and generic validation patterns.
 
-## 运行验证回路
+## Runtime validation loop
 
-生成 Operations 前，先判断是否值得且是否允许执行：
+Before generating Operations, judge whether it is worth and allowed to execute:
 
-- 项目存在可本地运行的服务、进程、CLI、worker、Job runner 或可执行测试链路，值得验证。
-- 用户明确禁止执行、要求只写文档 / 只输出报告 / 干跑 / 预算受限，或当前环境缺少依赖，不执行，只输出运行假设和待验证项。
-- 启动多个服务、连接真实外部系统、写真实业务数据、调用测试/生产环境接口前，先说明计划和风险；没有明确授权时只做本地编译、静态命令发现和无副作用探活。
+- Worth validating if the project has locally runnable services, processes, CLIs, workers, job runners, or executable test chains.
+- Do not execute if the user forbids execution, asks for docs-only / report-only / dry-run / budget-limited, or the environment lacks dependencies—only output runtime hypotheses and pending items.
+- Before starting many services, connecting real external systems, writing real business data, or calling test/prod APIs, state the plan and risks; without clear authorization, only do local compile, static command discovery, and side-effect-free health checks.
 
-执行时采用最小闭环，不追求一次启动全系统：
+Execute a minimal closed loop—do not try to boot the whole system at once:
 
-1. 命令发现：从 README、脚本、构建文件、package scripts、Docker/Compose、Makefile、Procfile、CI 配置中找候选命令。
-2. 构建验证：优先跑最小可用构建或模块级编译；记录失败命令、关键错误、是否属于工作区既有阻塞。
-3. 启动验证：选择最核心或最便宜的一个服务/进程启动；记录实际命令、端口、日志路径、profile/env/config 生效方式。
-4. 存活验证：curl 健康检查、API docs、端口、日志关键字或 CLI `--help`；记录什么响应代表“活着”。
-5. 最小请求验证：只执行无副作用或可回滚的最小请求；业务写入类验证放领域 KB，Operations 只记录通用验证方法和环境阻碍。
-6. 阻碍闭环：遇到缺依赖、端口冲突、配置未加载、DNS 不通、缓存未刷新、编译产物未更新等问题，尝试一次低风险修正并记录“错误现象 -> 根因判断 -> 可复用处理方式 -> 证据”。
-7. 停止与清理：若启动了本地进程，除非用户要求保留，结束前停止或说明仍在运行的进程、端口和日志路径。
+1. Command discovery: find candidate commands from README, scripts, build files, package scripts, Docker/Compose, Makefile, Procfile, CI configs.
+2. Build validation: prefer minimal viable build or module-level compile; record failed commands, key errors, and whether they are pre-existing workspace blockers.
+3. Start validation: start the most core or cheapest one service/process; record actual command, port, log path, and how profile/env/config take effect.
+4. Liveness validation: curl health, API docs, ports, log keywords, or CLI `--help`; record what response means “alive”.
+5. Minimal request validation: only side-effect-free or roll-backable minimal requests; business write validations go to domain KBs—Operations only records generic methods and environment blockers.
+6. Blocker closure: on missing deps, port conflicts, config not loaded, DNS down, cache not refreshed, stale build artifacts, try one low-risk fix and record “symptom → root-cause judgment → reusable handling → evidence”.
+7. Stop and clean up: if local processes were started, unless the user asks to keep them, stop before ending or document still-running processes, ports, and log paths.
 
-运行验证记录格式：
+Runtime validation record format:
 
-| 验证项 | 命令/动作 | 结果 | 证据 | 结论 | 落档位置 |
+| Item | Command/action | Result | Evidence | Conclusion | Persist to |
 |---|---|---|---|---|---|
-| [build/start/health/minimal-request/log] | [命令] | [成功/失败/阻塞] | [日志/状态码/错误片段] | [可复用经验或待验证] | [OPERATIONS/KM/不落档] |
+| [build/start/health/minimal-request/log] | [command] | [success/fail/blocked] | [log/status/error snippet] | [reusable experience or pending] | [OPERATIONS/KB/do not persist] |
 
-## 落档规则
+## Persistence rules
 
-- 已实际验证成功的启动命令、探活方式、配置生效方式、日志路径，写入 `OPERATIONS_GUIDE.md`。
-- 实际遇到并解决的环境阻碍，写入 `OPERATIONS_GUIDE.md` 的启动失败信号或验证决策表。
-- 未解决但会阻塞后续 Agent 的问题，写入 `OPERATIONS_GUIDE.md` 的未确认项 / 阻塞项。
-- 业务语义、业务 curl、业务表校验，写入对应领域知识库。
-- 跨领域共享的运行时机制，例如 AOP / Middleware 链、缓存一致性、MQ 重试、分库分表路由、权限拦截，写入对应 Guide。
-- 历史事故或一次性排障过程，不由 doc-init 伪造；后续由 `doc-update` 或 troubleshooting 文档沉淀。
+- Successfully validated start commands, health methods, config effect, log paths → `OPERATIONS_GUIDE.md`.
+- Environment blockers actually encountered and fixed → `OPERATIONS_GUIDE.md` start-failure signals or validation decision table.
+- Unresolved issues that would block later Agents → `OPERATIONS_GUIDE.md` unconfirmed / blockers.
+- Business semantics, business curls, business table checks → corresponding domain KB.
+- Cross-domain shared runtime mechanisms (AOP / Middleware chains, cache consistency, MQ retry, sharding routing, permission intercept) → corresponding Guide.
+- Historical incidents or one-off troubleshooting are not fabricated by doc-init; later `doc-update` or troubleshooting docs persist them.
 
-运行时业务证据分流详细规则见 `multi-source-evidence.md`「运行时证据分流」节。Operations 只保留启动/环境/探活类内容。
-| 非法参数错误码、校验规则、异常包装 | 领域 KB 边界条件和验证路径 |
-| 链路追踪 / 日志反推的核心调用链 | 领域 KB 或跨领域链路 Guide |
+Detailed runtime business-evidence routing: `multi-source-evidence.md` “Runtime evidence routing”. Operations keeps only start / environment / health content.
+| Illegal-parameter error codes, validation rules, exception wrapping | Domain KB edge cases and validation paths |
+| Core call chains inferred from tracing / logs | Domain KB or cross-domain chain Guide |
 
-## OPERATIONS_GUIDE 条件生成
+## Conditional OPERATIONS_GUIDE generation
 
-生成条件：
+Generate when:
 
-- 已执行运行验证回路，且得到至少一条可复用运行经验、验证命令、启动阻碍或环境差异，生成或更新 `OPERATIONS_GUIDE.md`。
-- 未执行运行验证，但项目存在明显可运行服务/进程，只生成薄版「运行假设与待验证清单」，所有静态推断必须标低置信度。
-- 项目没有本地运行面且无通用验证价值，不生成 `OPERATIONS_GUIDE.md`，把验证方式写进根 `AGENTS.md` 或对应 Guide。
+- The runtime validation loop ran and produced at least one reusable runtime experience, validation command, start blocker, or environment difference → create or update `OPERATIONS_GUIDE.md`.
+- Runtime validation was not run, but the project clearly has runnable services/processes → only a thin “runtime hypotheses and pending validation list”; all static inferences must be marked low confidence.
+- No local runtime surface and no generic validation value → do not generate `OPERATIONS_GUIDE.md`; put validation method in root `AGENTS.md` or the relevant Guide.
 
-必须包含：
+Must include:
 
-- `## 文档定位`：覆盖本地启动、环境配置、服务存活、通用验证和环境级排障；明确不覆盖具体业务规则、业务状态机、业务接口语义。
-- `## 验证结论摘要`：列出本次实际执行过哪些命令、哪些成功、哪些失败、哪些未执行；静态推断和实测结论必须分开写。
-- `## 站点 / 进程启动矩阵`：只列能独立启动或部署的站点、进程、CLI、Job runner、worker；字段包括启动模块/命令、启动类或入口、端口、必需外部依赖、本地可关闭项、置信度。
-- `## 本地启动前检查`：运行时版本、包管理命令、profile/env/config 文件路径、数据库/MQ/缓存/远程服务等硬依赖。
-- `## 启动命令`：按站点或进程给出确认过或低置信度标注过的命令；无法从代码确认的命令写入待确认。
-- `## 存活验证`：健康检查端点、API docs、关键日志、端口检查、配置生效检查方式。
-- `## 常见启动失败信号`：表格记录「现象 / 优先怀疑 / 验证方式 / 下一步 / 证据来源」，优先写实际遇到并验证过的问题。
-- `## 通用改动验证套路`：写跨领域通用方法，例如 HTTP 改动怎么 curl、DB 写入怎么查库、异步任务怎么看日志或表、权限失败怎么区分 auth 失败和业务失败。
-- `## 未确认项`：只保留会阻塞启动、验证或环境判断的缺口。
+- `## Document positioning`: covers local start, environment config, service liveness, generic validation, and environment-level troubleshooting; explicitly does not cover concrete business rules, business state machines, or business API semantics.
+- `## Validation conclusions summary`: which commands were actually run, which succeeded, which failed, which were skipped; keep static inference and measured conclusions separate.
+- `## Site / process start matrix`: only sites, processes, CLIs, job runners, workers that can start or deploy independently; fields include start module/command, start class or entry, port, required external deps, locally disable-able items, confidence.
+- `## Pre-start local checks`: runtime versions, package-manager commands, profile/env/config paths, hard deps (DB/MQ/cache/remote services).
+- `## Start commands`: per site/process, confirmed or low-confidence-labeled commands; unconfirmable from code → pending confirmation.
+- `## Liveness validation`: health endpoints, API docs, key logs, port checks, config-effect checks.
+- `## Common start-failure signals`: table of “symptom / primary suspicion / how to verify / next step / evidence source”, preferring issues actually encountered and validated.
+- `## Generic change-validation playbook`: cross-domain methods—e.g. how to curl HTTP changes, how to query DB writes, how to watch async jobs in logs/tables, how to distinguish auth failure vs business failure.
+- `## Unconfirmed items`: only gaps that block start, validation, or environment judgment.
 
-禁止写入：
+Must not include:
 
-- 业务域专属接口 curl、业务表字段检查、状态机验证；这些应进入对应 KB。
-- 完整项目模块结构、包结构、技术栈百科；这些应进入根 `AGENTS.md`、领域 KB 或专项 Guide。
-- 文档自身的「何时该读 / 必读」路由句；路由只写根 `AGENTS.md`。
-- 无证据的运维历史、真实故障台账、生产部署细节。
-- 把静态猜测写成已验证事实；所有未经运行验证的启动命令、端口、配置加载方式都必须标「待验证」。
+- Domain-specific API curls, business table/field checks, state-machine validation—those belong in the corresponding KB.
+- Full project module/package structure or tech-stack encyclopedia—those belong in root `AGENTS.md`, domain KBs, or specialized Guides.
+- Self-routing “when to read / must read” sentences—routing only in root `AGENTS.md`.
+- Unevidenced ops history, real incident ledgers, production deploy details.
+- Writing static guesses as verified facts; every start command, port, and config-load method not runtime-validated must be marked “pending validation”.
 
-## 自评
+## Self-assessment
 
-文档覆盖度自评中必须包含 Operations 验证覆盖：
+Doc coverage self-assessment must include Operations validation coverage:
 
-- 运行验证：已执行 [构建/启动/探活/最小请求/日志检查]；未执行 [原因]
-- 高置信经验：已沉淀 [启动命令/配置生效/端口/日志/修正路径]
-- 低置信假设：仍有 [启动命令/依赖/外部服务/环境差异] 未验证，已标待验证
-- 不生成 Operations 的原因：[无运行面 / 用户禁止执行 / 环境不足 / 无可复用运维价值]
+- Runtime validation: executed [build/start/health/minimal-request/log check]; not executed [reason]
+- High-confidence experience persisted: [start commands/config effect/ports/logs/fix paths]
+- Low-confidence hypotheses still open: [start commands/deps/external services/env differences] marked pending validation
+- Why Operations was not generated: [no runtime surface / user forbade execution / insufficient environment / no reusable ops value]

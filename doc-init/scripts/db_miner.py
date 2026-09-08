@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""只读数据库证据挖掘工具。
+"""Read-only database evidence miner.
 
-脚本负责确定性采集：配置候选、连接测试、schema、轻量画像、弱关系候选和证据包骨架。
-业务解释、关键表逐字段判断和最终落档由 Agent 结合代码证据完成。
+Deterministic collection: config candidates, connection tests, schema, light profiling,
+weak relationship candidates, and evidence-pack skeletons.
+Business interpretation, critical-table field judgments, and final docs are Agent work.
 """
 
 from __future__ import annotations
@@ -251,7 +252,7 @@ def discover_config(args: argparse.Namespace) -> None:
                     "db_type_hint": db_type_hint(value),
                     "value": maybe_mask_secret(value, args.mask_sensitive),
                     "confidence": "medium",
-                    "notes": ["配置片段候选，需结合运行环境、启动参数或配置覆盖关系判断是否生效"],
+                    "notes": ["config fragment candidate; confirm it is active via runtime env, startup args, or config overlay"],
                 }
             )
     deduped = []
@@ -284,7 +285,7 @@ def psycopg2_connect(url: str):
     try:
         import psycopg2
     except Exception as exc:  # pragma: no cover
-        raise RuntimeError("缺少 psycopg2，无法使用 PostgreSQL-like fallback") from exc
+        raise RuntimeError("psycopg2 missing; cannot use PostgreSQL-like fallback") from exc
     parsed = urlparse(url)
     return psycopg2.connect(
         host=parsed.hostname,
@@ -308,7 +309,7 @@ def get_sqlalchemy_engine(url: str):
     try:
         from sqlalchemy import create_engine
     except Exception as exc:  # pragma: no cover - depends on optional package
-        raise RuntimeError("缺少 SQLAlchemy。可安装到本地环境后重试：python3 -m pip install sqlalchemy") from exc
+        raise RuntimeError("SQLAlchemy missing. Install locally and retry: python3 -m pip install sqlalchemy") from exc
     return create_engine(url)
 
 
@@ -351,7 +352,7 @@ def test_connection(args: argparse.Namespace) -> None:
 def sqlite_introspect(url: str) -> Dict[str, Any]:
     sqlite_path = normalize_sqlite_path(url)
     if not sqlite_path:
-        raise ValueError("不是 SQLite URL")
+        raise ValueError("not a SQLite URL")
     con = sqlite3.connect(sqlite_path)
     con.row_factory = sqlite3.Row
     try:
@@ -408,7 +409,7 @@ def sqlalchemy_introspect(url: str) -> Dict[str, Any]:
     try:
         from sqlalchemy import inspect
     except Exception as exc:  # pragma: no cover
-        raise RuntimeError("缺少 SQLAlchemy。可安装到本地环境后重试：python3 -m pip install sqlalchemy") from exc
+        raise RuntimeError("SQLAlchemy missing. Install locally and retry: python3 -m pip install sqlalchemy") from exc
     engine = get_sqlalchemy_engine(url)
     inspector = inspect(engine)
     try:
@@ -558,7 +559,7 @@ def find_table(schema: Dict[str, Any], name: str) -> Dict[str, Any]:
     for table in schema.get("tables", []):
         if table.get("name") == name or table_full_name(table) == name:
             return table
-    raise ValueError(f"未在 catalog 中找到表：{name}")
+    raise ValueError(f"table not found in catalog: {name}")
 
 
 def table_tokens(name: str) -> List[str]:
@@ -606,11 +607,11 @@ def classify_catalog(args: argparse.Namespace) -> None:
         groups.setdefault(key, []).append(table_full_name(table))
         lowered = name.lower()
         if any(x in lowered for x in ["config", "dict", "dictionary", "setting"]):
-            guide_candidates.append({"table": table_full_name(table), "topic": "CONFIG_OR_DICTIONARY", "reason": "表名像配置/字典表"})
+            guide_candidates.append({"table": table_full_name(table), "topic": "CONFIG_OR_DICTIONARY", "reason": "table name looks like config/dictionary"})
         if any(x in lowered for x in ["flow", "workflow", "task", "job"]):
-            guide_candidates.append({"table": table_full_name(table), "topic": "FLOW_OR_TASK", "reason": "表名像流程/任务表"})
+            guide_candidates.append({"table": table_full_name(table), "topic": "FLOW_OR_TASK", "reason": "table name looks like flow/task"})
         if any(x in lowered for x in ["log", "history", "record"]):
-            guide_candidates.append({"table": table_full_name(table), "topic": "HISTORY_OR_LOG", "reason": "表名像历史/日志表，通常不作为领域主表"})
+            guide_candidates.append({"table": table_full_name(table), "topic": "HISTORY_OR_LOG", "reason": "table name looks like history/log; usually not a domain primary table"})
     domain_hints = [
         {"hint": key, "tables": value[:50], "table_count": len(value)}
         for key, value in sorted(groups.items(), key=lambda item: len(item[1]), reverse=True)
@@ -620,7 +621,7 @@ def classify_catalog(args: argparse.Namespace) -> None:
             "metadata": {"generated_at": utc_now(), "scan_level": "catalog-classification"},
             "domain_hints": domain_hints,
             "guide_candidates": guide_candidates,
-            "note": "基于表名/字段名的轻量候选，供 Agent 结合代码和业务语义判断",
+            "note": "light candidates from table/column names for Agent judgment with code and business semantics",
         },
         args.output,
     )
@@ -661,7 +662,7 @@ def plan_domain_scan(args: argparse.Namespace) -> None:
             "domain": args.domain,
             "keywords": keywords,
             "tables": tables[: args.max_tables],
-            "note": "这是领域细扫计划，不代表已经完成表/字段深挖",
+            "note": "domain deep-scan plan only; does not mean table/field deep dive is done",
         },
         args.output,
     )
@@ -698,7 +699,7 @@ def summarize_sample(table: Dict[str, Any], rows: List[Dict[str, Any]], args: ar
                 "sample_non_null_count": len(non_null),
                 "sample_values": sample_values,
                 "special_values_in_sample": list(dict.fromkeys(special_values)),
-                "note": "基于有限样本，不代表全库分布",
+                "note": "based on a limited sample; not full-database distribution",
             }
         )
     return {
@@ -713,7 +714,7 @@ def summarize_sample(table: Dict[str, Any], rows: List[Dict[str, Any]], args: ar
 def sqlite_profile(url: str, schema: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
     sqlite_path = normalize_sqlite_path(url)
     if not sqlite_path:
-        raise ValueError("不是 SQLite URL")
+        raise ValueError("not a SQLite URL")
     con = sqlite3.connect(sqlite_path)
     con.row_factory = sqlite3.Row
     try:
@@ -771,7 +772,7 @@ def sqlalchemy_profile(url: str, schema: Dict[str, Any], args: argparse.Namespac
     try:
         from sqlalchemy import text
     except Exception as exc:  # pragma: no cover
-        raise RuntimeError("缺少 SQLAlchemy。可安装到本地环境后重试：python3 -m pip install sqlalchemy") from exc
+        raise RuntimeError("SQLAlchemy missing. Install locally and retry: python3 -m pip install sqlalchemy") from exc
     engine = get_sqlalchemy_engine(url)
     preparer = engine.dialect.identifier_preparer
 
@@ -844,13 +845,13 @@ def postgres_like_profile(url: str, schema: Dict[str, Any], args: argparse.Names
 def analyze_field(args: argparse.Namespace) -> None:
     catalog = read_json(args.catalog)
     if "." not in args.field:
-        raise ValueError("--field 必须使用 table.column 或 schema.table.column")
+        raise ValueError("--field must be table.column or schema.table.column")
     parts = args.field.split(".")
     table_name = ".".join(parts[:-1])
     column_name = parts[-1]
     table = find_table(catalog, table_name)
     if column_name not in {col.get("name") for col in table.get("columns", [])}:
-        raise ValueError(f"表 {table_name} 中不存在字段 {column_name}")
+        raise ValueError(f"column {column_name} not found in table {table_name}")
 
     temp_args = argparse.Namespace(
         tables=table_full_name(table),
@@ -892,7 +893,7 @@ def analyze_field(args: argparse.Namespace) -> None:
             "schema": next((col for col in table.get("columns", []) if col.get("name") == column_name), {}),
             "sample_summary": field_summary,
             "sample_values": sample_values,
-            "note": "字段分析基于有限样本，语义判断需 Agent 结合代码和业务上下文完成",
+            "note": "field analysis is sample-based; semantic judgment needs Agent with code and business context",
         },
         args.output,
     )
@@ -923,7 +924,7 @@ def infer(args: argparse.Namespace) -> None:
                         "to_table": target,
                         "to_columns": list(pk_by_table.get(target) or ["id"]),
                         "confidence": "low",
-                        "evidence": ["字段命名匹配，尚未做数据覆盖率验证"],
+                        "evidence": ["column-name match; data coverage not verified yet"],
                     }
                 )
     write_json({"metadata": {"generated_at": utc_now()}, "relationship_findings": candidates}, args.output)
@@ -957,9 +958,9 @@ def export_evidence(args: argparse.Namespace) -> None:
             {
                 "table": table.get("name"),
                 "schema": table.get("schema"),
-                "role": "待业务域确认",
+                "role": "pending domain confirmation",
                 "domain": None,
-                "why_critical": ["包含高风险字段"] if risk_cols else [],
+                "why_critical": ["contains high-risk columns"] if risk_cols else [],
                 "risk_columns": risk_cols,
                 "field_analysis_status": {
                     "cataloged": True,
@@ -988,7 +989,7 @@ def export_evidence(args: argparse.Namespace) -> None:
             "catalog_table_count": len(schema.get("tables", [])),
             "sampled_table_count": len(profile_data.get("tables", [])),
             "critical_tables_need_agent_analysis": [t["table"] for t in tables if t["why_critical"]],
-            "notes": ["脚本只生成证据骨架；业务域划分和关键表逐字段语义需 Agent 结合代码、catalog 和有限样本补齐"],
+            "notes": ["script emits evidence skeleton only; domain split and critical-table field semantics need Agent with code, catalog, and samples"],
         },
     }
     write_json(evidence, args.output)
@@ -1044,7 +1045,7 @@ def summarize_catalog(args: argparse.Namespace) -> None:
                     }
                     for item in plan.get("tables", [])[: args.max_tables_per_domain]
                 ],
-                "note": "只代表后续领域 KB 生成前的细扫候选；本命令未读取任何行级数据",
+                "note": "deep-scan candidates before domain KB generation; this command read no row-level data",
             }
         )
 
@@ -1089,63 +1090,63 @@ def summarize_catalog(args: argparse.Namespace) -> None:
             },
             "domain_scan_plans": plan_summaries,
             "explicitly_not_done": [
-                "未读取行级数据",
-                "未执行 sample-table/profile/analyze-field",
-                "未执行 count/count distinct/全库画像",
-                "未生成项目长期文档",
+                "did not read row-level data",
+                "did not run sample-table/profile/analyze-field",
+                "did not run count/count distinct/full-DB profiling",
+                "did not generate long-lived project docs",
             ],
-            "note": "这是 catalog-only 摘要，供 Agent 生成知识边界报告；真实字段语义仍需在具体领域 KB 生成前按需 sample/analyze",
+            "note": "catalog-only summary for Agent knowledge-boundary reports; real field semantics still need on-demand sample/analyze before domain KB",
         },
         args.output,
     )
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="只读数据库证据挖掘工具")
+    parser = argparse.ArgumentParser(description="Read-only database evidence miner")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("discover-config", help="扫描项目中的数据库连接候选")
+    p = sub.add_parser("discover-config", help="scan project for DB connection candidates")
     p.add_argument("--root", default=".")
     p.add_argument("--max-file-bytes", type=int, default=512_000)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=discover_config)
 
-    p = sub.add_parser("test-connection", help="测试只读连接")
+    p = sub.add_parser("test-connection", help="test a read-only connection")
     p.add_argument("--url", required=True)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=test_connection)
 
-    p = sub.add_parser("catalog", help="读取轻量表/字段目录；默认不扫数据")
+    p = sub.add_parser("catalog", help="read light table/column catalog; no data scan by default")
     p.add_argument("--url", required=True)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=introspect)
 
-    p = sub.add_parser("introspect", help="兼容旧命令：等同 catalog")
+    p = sub.add_parser("introspect", help="legacy alias for catalog")
     p.add_argument("--url", required=True)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=introspect)
 
-    p = sub.add_parser("classify-catalog", help="基于 catalog 生成轻量业务域候选")
+    p = sub.add_parser("classify-catalog", help="light domain candidates from catalog")
     p.add_argument("--catalog", required=True)
     p.add_argument("--output")
     p.set_defaults(func=classify_catalog)
 
-    p = sub.add_parser("plan-domain-scan", help="按业务域关键词生成后续细扫计划")
+    p = sub.add_parser("plan-domain-scan", help="build a follow-up deep-scan plan from domain keywords")
     p.add_argument("--catalog", required=True)
     p.add_argument("--domain", required=True)
-    p.add_argument("--keywords", help="逗号分隔的业务关键词")
+    p.add_argument("--keywords", help="comma-separated business keywords")
     p.add_argument("--max-tables", type=int, default=30)
     p.add_argument("--output")
     p.set_defaults(func=plan_domain_scan)
 
-    p = sub.add_parser("summarize-catalog", help="汇总 catalog/domain-plan 为目录级报告；不读取行级数据")
+    p = sub.add_parser("summarize-catalog", help="summarize catalog/domain-plan at catalog level; no row data")
     p.add_argument("--catalog", required=True)
     p.add_argument("--domain-hints")
-    p.add_argument("--domain-plan", action="append", help="可重复传入多个 plan-domain-scan 输出")
+    p.add_argument("--domain-plan", action="append", help="repeatable; multiple plan-domain-scan outputs")
     p.add_argument("--wide-table-threshold", type=int, default=30)
     p.add_argument("--min-common-column-tables", type=int, default=5)
     p.add_argument("--max-domain-hints", type=int, default=20)
@@ -1157,7 +1158,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output")
     p.set_defaults(func=summarize_catalog)
 
-    p = sub.add_parser("sample-table", help="对指定表抽少量样本；默认不做 count/distinct")
+    p = sub.add_parser("sample-table", help="sample a few rows from tables; no count/distinct by default")
     p.add_argument("--url", required=True)
     p.add_argument("--catalog", "--schema", dest="schema")
     p.add_argument("--tables")
@@ -1166,11 +1167,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--top-values", type=int, default=10)
     p.add_argument("--sample-rows", type=int, default=30)
     p.add_argument("--include-rows", type=int, default=5)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=profile)
 
-    p = sub.add_parser("profile", help="兼容旧命令：等同 sample-table，不做全表统计")
+    p = sub.add_parser("profile", help="legacy alias for sample-table; no full-table stats")
     p.add_argument("--url", required=True)
     p.add_argument("--catalog", "--schema", dest="schema")
     p.add_argument("--tables")
@@ -1179,27 +1180,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--top-values", type=int, default=10)
     p.add_argument("--sample-rows", type=int, default=30)
     p.add_argument("--include-rows", type=int, default=5)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=profile)
 
-    p = sub.add_parser("analyze-field", help="对指定字段做有限样本点查")
+    p = sub.add_parser("analyze-field", help="limited sample probe for one field")
     p.add_argument("--url", required=True)
     p.add_argument("--catalog", required=True)
-    p.add_argument("--field", required=True, help="table.column 或 schema.table.column")
+    p.add_argument("--field", required=True, help="table.column or schema.table.column")
     p.add_argument("--top-values", type=int, default=10)
     p.add_argument("--sample-rows", type=int, default=50)
     p.add_argument("--include-rows", type=int, default=20)
-    p.add_argument("--mask-sensitive", action="store_true", help="显式启用脱敏；默认保留测试环境原值")
+    p.add_argument("--mask-sensitive", action="store_true", help="explicitly mask secrets; default keeps test-env raw values")
     p.add_argument("--output")
     p.set_defaults(func=analyze_field)
 
-    p = sub.add_parser("infer", help="从 schema 推断弱关系候选")
+    p = sub.add_parser("infer", help="infer weak relationship candidates from schema")
     p.add_argument("--catalog", "--schema", dest="schema", required=True)
     p.add_argument("--output")
     p.set_defaults(func=infer)
 
-    p = sub.add_parser("export-evidence", help="合并 catalog/domain-plan/samples/relations 为证据包骨架")
+    p = sub.add_parser("export-evidence", help="merge catalog/domain-plan/samples/relations into evidence skeleton")
     p.add_argument("--catalog")
     p.add_argument("--schema")
     p.add_argument("--domain-plan")

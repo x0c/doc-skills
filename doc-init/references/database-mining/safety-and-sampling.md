@@ -1,61 +1,61 @@
 # Safety And Sampling
 
-数据库挖掘默认面向本机或测试环境，信息完整度优先；安全边界主要是只读、渐进、限量和可回收工具安装。
+Database mining defaults to local or test environments and prioritizes information completeness; the main safety boundaries are read-only, progressive, limited volume, and reclaimable tool installs.
 
-## 只读边界
+## Read-only boundary
 
-- 只允许元数据查询、`SELECT`、只读 explain 或轻量统计。
-- 禁止 `INSERT`、`UPDATE`、`DELETE`、`MERGE`、`TRUNCATE`、`ALTER`、`DROP`、`CREATE`、`GRANT`、`LOCK`、手动事务写入和存储过程调用。
-- catalog 阶段禁止执行全表 `count(*)`、`count(distinct)`、大排序、大聚合或无上限 join。
-- 表/字段深挖阶段默认只抽样；统计类查询必须显式开启，并说明为什么字段语义必须依赖统计。
-- 连接失败、权限不足或疑似生产高风险时，输出缺失项，不绕过安全限制。
+- Only metadata queries, `SELECT`, read-only explain, or lightweight stats are allowed.
+- Forbid `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `TRUNCATE`, `ALTER`, `DROP`, `CREATE`, `GRANT`, `LOCK`, manual write transactions, and stored-procedure calls.
+- During catalog, forbid full-table `count(*)`, `count(distinct)`, large sorts, large aggregations, or unbounded joins.
+- During table/field deep dives, sample by default; stats queries must be explicitly enabled, with an explanation of why field semantics depend on stats.
+- On connection failure, insufficient permissions, or suspected high-risk production access, report missing items; do not bypass safety limits.
 
-## 工具安装
+## Tool installation
 
-用户授权数据库挖掘时，缺少轻量 driver / CLI 可直接准备：
+When the user authorizes database mining, missing lightweight drivers / CLIs may be prepared directly:
 
-- 优先使用项目已有工具或系统已有命令。
-- 其次使用 skill-local venv 或用户级 Python 包。
-- 不安装大型 GUI 工具。
-- 不做系统级不可回收改动。
-- 安装行为只服务于只读连接和元数据/采样查询。
+- Prefer tools already in the project or commands already on the system.
+- Next, use a skill-local venv or user-level Python packages.
+- Do not install large GUI tools.
+- Do not make unreclaimable system-level changes.
+- Installs must serve only read-only connections and metadata/sample queries.
 
-## 渐进层级
+## Progressive levels
 
-默认层级：
+Default levels:
 
-1. catalog：只读取表、字段、主键、索引、注释等元数据，用于业务域划分。
-2. sample-table：只对明确业务域内的指定表抽少量行，用于看真实值长什么样。
-3. analyze-field：只对具体字段做点查，用于确认特殊值、枚举候选、NULL 语义、反常规设计。
+1. catalog: read only table/column/PK/index/comment metadata for domain partitioning.
+2. sample-table: sample a few rows from specified tables inside a clear business domain, to see what real values look like.
+3. analyze-field: spot-check specific columns to confirm special values, enum candidates, NULL semantics, and unconventional design.
 
-不要跳过 catalog 直接全库 sample，更不要一上来全库统计。
+Do not skip catalog and sample the whole database; do not start with whole-database stats.
 
-## 采样限制
+## Sampling limits
 
-默认建议：
+Default recommendations:
 
-- 单表样本行数：20-100。
-- 单次最多抽样表数：10；大项目先按业务域/关键表收敛。
-- 字段值摘要基于样本生成，默认不代表全库分布。
-- JSON/text 字段：只分析 key 结构、长度、明显枚举，不输出大段原文。
-- 大表优先使用有限 sample，不做全表扫描。
+- Sample rows per table: 20–100.
+- Max tables sampled per run: 10; for large projects, first narrow by domain / critical tables.
+- Value summaries are based on the sample and do not represent full-database distribution by default.
+- JSON/text columns: analyze only key structure, length, and obvious enums; do not dump large raw payloads.
+- Prefer bounded samples for large tables; do not full-scan.
 
-## 数据可见性
+## Data visibility
 
-默认不脱敏，因为本 skill 的目标是挖掘测试数据中的真实业务语义。以下情况才启用脱敏：
+No masking by default, because this skill aims to mine real business semantics from test data. Enable masking only when:
 
-- 用户明确要求脱敏。
-- 当前连接明确不是测试环境。
-- 输出要提交到外部系统或共享给无权限人员。
+- The user explicitly requires masking.
+- The current connection is clearly not a test environment.
+- Output will be submitted to an external system or shared with people without access.
 
-启用脱敏时，脚本使用 `--mask-sensitive`，再按字段名和值模式处理手机号、邮箱、token、password、secret 等信息。
+When masking is enabled, scripts use `--mask-sensitive`, then handle phone numbers, emails, tokens, passwords, secrets, and similar by column name and value patterns.
 
-即使不脱敏，也不要做无限量数据导出；长期文档应优先记录业务事实、分布、特殊值、语义判断和 AI 易错点，而不是粘贴大段原始行。
+Even without masking, do not export unbounded data; long-lived docs should prioritize business facts, distributions, special values, semantic judgments, and AI pitfalls—not paste large raw rows.
 
-## 置信度
+## Confidence
 
-- 高：schema、注释、代码读写、数据分布互相印证。
-- 中：schema 和数据分布一致，但缺少代码或用户确认。
-- 低：只来自字段名、少量样本或弱关系推断。
+- High: schema, comments, code read/write paths, and data distribution corroborate each other.
+- Medium: schema and data distribution agree, but code or user confirmation is missing.
+- Low: based only on column names, a small sample, or weak-relationship inference.
 
-低置信内容可以写入证据包，但落档到长期文档时必须标注待确认。
+Low-confidence content may go into the evidence pack, but must be marked pending confirmation when filed into long-lived docs.

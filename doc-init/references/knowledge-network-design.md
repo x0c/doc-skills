@@ -1,171 +1,174 @@
 # Knowledge Network Design
 
-本文定义 doc-init Phase 2 的文档组织原则。进入项目文档初始化阶段时先读本文件，用它判断文档粒度、命名、KB/Guide 边界和非业务项目处理方式。
+This document defines doc-init Phase 2 documentation organization principles. Read it first when entering project doc initialization; use it to judge doc granularity, naming, KB/Guide boundaries, and how to handle non-business projects.
 
-## 核心目标
+## Core goal
 
-文档的根本作用是替代经验：把只有项目老手才知道的业务边界、代码入口、表入口、流程入口、隐性约束和验证路径外化成 AI 可读的知识网络，让 AI 从「通用正确」升级到「项目正确」。
+Docs exist to replace tribal knowledge: externalize business boundaries, code entries, table entries, flow entries, hidden constraints, and validation paths that only veterans know into an AI-readable knowledge network—so AI moves from “generally correct” to “correct for this project.”
 
-Phase 2 不是生成全局资源字典，也不是把所有表、类、接口揉成大索引，而是按实际工作场景重建 AI Coding Agent 上手地图。
+Phase 2 is not generating a global resource dictionary, nor mashing every table/class/API into a mega-index. It rebuilds an onboarding map for AI coding agents around real work scenarios.
 
-## 组织原则
+## Organization principles
 
-1. **入口是业务场景，不是代码模块**：用户说「改支付渠道」「加个推送通知」「订单超时有 bug」，AI 应先从根 `AGENTS.md` 路由到对应**业务域**知识库。KB 文件名必须体现业务概念（`PAYMENT_KNOWLEDGE_BASE.md`、`ORDER_KNOWLEDGE_BASE.md`），**禁止**以代码模块名命名（`BACKEND_KB`、`SERVICE_LAYER_KB`、`CORE_MODULE_KB`）。
-2. 领域知识库是主干：每个**业务领域 / 业务条线**生成一份 `*_KNOWLEDGE_BASE.md`，内部包含该领域从配置到执行的**完整链路**——业务逻辑、代码入口（跨多个模块）、表入口、流程入口、隐性知识和验证路径。一份 KB 应能回答"改这个业务需要知道什么"的全部问题，而不是让 AI 到另一份"模块 KB"里找另一半。**路径完整性约束**：KB 中引用的代码路径必须是从项目根可直接访问的相对路径（禁止使用省略号缩写如 `core/.../account/`）。Agent 读文档后应能直接 glob 或 ls 到目标，无需二次搜索。
-3. 公共 Guide 是横向机制：多个领域共享的复杂机制才单独生成 `*_GUIDE.md`，并由相关知识库按需引用。
-4. 文档之间形成知识网络：`AGENTS.md` 负责路由；领域知识库引用公共 Guide 和相关领域知识库；Guide 说明机制边界和适用领域。
-5. 不默认生成全局大而全索引：不把 `TABLE_INDEX.md` / `CODE_INDEX.md` 作为默认产物。只有项目小到无法分域，或用户明确要求全局索引时，才简化为单份知识库或补充全局索引。
-6. **业务域 ≠ 代码模块（核心硬约束，双向）**：多模块项目中，同一业务域的代码通常**散布在多个子模块**（配置层、执行层、实体层、接口层）。必须先识别业务域，再在一份 KB 中汇聚该域在各模块的入口。**禁止**按子模块 1:1 建文档——那是代码索引，不是业务知识网络。**对称约束**：同一模块内包含多个独立业务对象时，**必须拆分为独立 KB**——判定方法：如果模块内存在两个业务对象，改其中一个完全不需要了解另一个（有独立的状态机、独立的表族、独立的 API 入口），说明这是多个域塞进了一份文档，必须拆。典型反面案例：把"客户管理+积分账户+等级账户"揉成一份"执行层 KB"，导致改等级升级的开发者在 265 行中找 10 行相关内容。
-7. 路由只写在 `AGENTS.md`：根 `AGENTS.md` 告诉 Agent「什么任务该读哪篇文档」；`docs/` 内部文档不要写「何时该读 / 必读」自我导航，改用「文档定位 / 覆盖范围 / 不覆盖范围」。
-8. 人机协同是核心能力：代码只能提供可见结构，真实经验来自用户和运行实践。用户补充的信息必须标注来源，并与代码证据互相校验后落档。
-9. 领域语言必须统一：同一业务概念在最终文档中只使用一个主称谓；代码类名、枚举名、表名、接口字段、数据库注释、运行日志、commit message 和用户口头叫法作为别名证据处理，不让正文在多个叫法之间来回切换。
-10. **先完整领域地图，再分批深写**：doc-init 的第一步是把项目全部业务/功能领域枚举成完整领域地图（锚定 `project_inventory.py` 的 `submodules` + 顶层目录结构 + 入口候选），然后把每个领域标注为「本次深写」或「待补充」。未深写的领域不得静默丢弃，必须全部登记进根 `AGENTS.md` 的待补充 backlog 段。
-11. **产品真相先于代码拓扑**：`project_inventory.py` 的子模块/目录/入口候选只是机械候选，反映代码怎么组织，不等于产品真有这个功能。领域地图定稿前必须经产品北极星（见 `references/human-intake.md`「产品北极星先行」）校验：候选模块在产品定义中找不到依据、且未接入导航/路由可达，是死代码或实现漂移的信号，不是新领域——先列为待确认发现，不直接坐实进地图。
+1. **Entry is the business scenario, not the code module:** When the user says “change payment channels,” “add a push notification,” or “order timeout bug,” AI should route from root `AGENTS.md` to the matching **business-domain** knowledge base. KB filenames must reflect business concepts (`PAYMENT_KNOWLEDGE_BASE.md`, `ORDER_KNOWLEDGE_BASE.md`). **Forbidden:** naming by code modules (`BACKEND_KB`, `SERVICE_LAYER_KB`, `CORE_MODULE_KB`).
+2. Domain knowledge bases are the trunk: each **business domain / business line** gets one `*_KNOWLEDGE_BASE.md` covering that domain’s **full chain** from config through execution—business logic, code entries (across modules), table entries, flow entries, hidden knowledge, and validation paths. One KB should answer “what do I need to know to change this business,” not send AI to another “module KB” for the other half. **Path completeness:** code paths cited in a KB must be relative paths reachable from the project root (no ellipsis shortcuts like `core/.../account/`). After reading the doc, an Agent should be able to glob or ls to the target without a second search.
+3. Shared Guides are horizontal mechanisms: only complex mechanisms shared by multiple domains get a separate `*_GUIDE.md`, referenced on demand by related KBs.
+4. Docs form a knowledge network: `AGENTS.md` routes; domain KBs reference shared Guides and related domain KBs; Guides state mechanism boundaries and applicable domains.
+5. Do not default to global mega-indexes: do not make `TABLE_INDEX.md` / `CODE_INDEX.md` default outputs. Only when the project is too small to split domains, or the user explicitly asks for a global index, simplify to a single KB or add a global index.
+6. **Business domain ≠ code module (core hard constraint, bidirectional):** In multi-module projects, the same domain’s code usually **spans multiple submodules** (config / execution / entity / API layers). Identify the business domain first, then gather that domain’s entries across modules into one KB. **Forbidden:** 1:1 docs per submodule—that is a code index, not a business knowledge network. **Symmetric constraint:** when one module contains multiple independent business objects, **you must split into separate KBs**—test: if changing one object needs zero knowledge of the other (independent state machines, table families, API entries), you stuffed multiple domains into one doc and must split. Classic anti-pattern: merging “customer management + points account + tier account” into one “execution-layer KB,” so a developer changing tier upgrades hunts 10 relevant lines in 265.
+7. Routing lives only in `AGENTS.md`: root `AGENTS.md` tells Agents which doc to read for which task; docs under `docs/` must not self-navigate with “when to read / must read”—use “document positioning / covers / does not cover” instead.
+8. Human collaboration is a core capability: code only provides visible structure; real experience comes from users and runtime practice. User supplements must be sourced and cross-checked with code evidence before persistence.
+9. Domain language must be unified: one canonical term per business concept in final docs; code class/enum/table/API field names, DB comments, runtime logs, commit messages, and oral user names are alias evidence—do not switch among many names in body text.
+10. **Full domain map first, then batched deep-write:** Step one of doc-init is enumerating all business/functional domains into a complete domain map (anchored on `project_inventory.py` `submodules` + top-level dirs + entry candidates), then labeling each as “deep-write this session” or “to be filled.” Undeepened domains must not be silently dropped—register all of them into the root `AGENTS.md` backlog section.
+11. **Product truth precedes code topology:** `project_inventory.py` submodule/dir/entry candidates are mechanical candidates reflecting how code is organized—not that the product truly has the feature. Before finalizing the domain map, validate against the product north star (see `references/human-intake.md` “Product north star first”): candidates with no basis in the product definition and not reachable via nav/routing are dead-code or implementation-drift signals—not new domains. List them as pending discoveries first; do not promote them straight onto the map.
 
-## 领域语言统一
+## Domain language unification
 
-多数据源会带来多套叫法：代码、数据库注释、需求文档、用户 Q&A、运行日志、commit message 可能都在说同一件事，但名字不同。`doc-init` 必须先归一化，再写文档；否则 AI 后续接需求时会被同义词和近义词带偏。
+Multiple data sources bring multiple names: code, DB comments, requirements, user Q&A, runtime logs, and commit messages may describe the same thing differently. `doc-init` must normalize first, then write; otherwise later Agents get derailed by synonyms.
 
-归一化原则：
+Normalization principles:
 
-- 默认不生成独立术语表。领域知识库应像自然文档一样稳定使用主称谓，而不是塞入大段词典。
-- 主称谓优先选择用户确认的团队日常叫法、项目已有核心文档、当前产品/接口契约中的稳定叫法；用户明确说“团队都这么叫”时，该叫法优先于代码类名、数据库注释和 commit message。
-- 代码类名、枚举值、表名、字段名、接口参数名必须原样保留，作为实现入口或首次出现时的括号说明，不要为了统一业务语言而改写实现名。
-- 数据库表/字段注释和代码注释可能是历史叫法或局部叫法，只能作为证据；若与用户叫法或核心文档冲突，不直接升级为主称谓。
-- Commit message 是人类历史叫法证据，权重低于用户确认和核心文档，高于纯模型猜测；只能辅助发现别名和追问，不得单独决定主称谓。
-- 同名异义、异名同义、参数名跨场景复用且含义不同、字段注释与真实语义冲突时，必须进入 Q&A 或低置信消歧。
+- Do not default to a standalone glossary. Domain KBs should stably use the canonical term like natural docs—not dump dictionaries.
+- Prefer as canonical: user-confirmed everyday team names, existing core project docs, stable names in current product/API contracts; when the user explicitly says “everyone on the team calls it this,” that name outranks code class names, DB comments, and commit messages.
+- Keep code class names, enum values, table/field names, and API parameter names verbatim as implementation entries or first-appearance parentheticals—do not rewrite implementation names to unify business language.
+- DB table/field comments and code comments may be historical or local names—evidence only; if they conflict with user names or core docs, do not promote them to canonical.
+- Commit messages are historical human-name evidence: weight below user confirmation and core docs, above pure model guesses; only help discover aliases and follow-ups—never decide the canonical term alone.
+- Homonyms, synonyms, parameters reused across scenarios with different meanings, or comments conflicting with real semantics must enter Q&A or low-confidence disambiguation.
 
-呈现方式：
+Presentation:
 
-- 普通别名只在首次出现或入口索引中轻量说明，例如：`忠诚度计划（代码实体：LoyaltyProgram；枚举：LOYALTY_PROGRAM；主表：d_oc_l_loyalty_program）`。
-- 高风险混淆才写入「核心业务规则与隐性约束」的 `【消歧】` 条目，例如 `progId` 在不同流程里代表不同 ID、两个状态字段不能互传等。
-- 不为每篇 KB 默认新增「术语表」章节；只有用户明确要求，或一个领域存在大量高频混淆且没有别的清晰承载位置时，才可以新增短小的「概念消歧」小节。
+- Ordinary aliases: light note at first appearance or in entry indexes, e.g. `loyalty program (code entity: LoyaltyProgram; enum: LOYALTY_PROGRAM; main table: d_oc_l_loyalty_program)`.
+- High-risk confusion only: write `【Disambiguation】` entries under “Core business rules and hidden constraints,” e.g. `progId` means different IDs in different flows, two status fields must not be interchanged, etc.
+- Do not default a “Glossary” section per KB; only add a short “Concept disambiguation” subsection if the user asks, or a domain has many high-frequency confusions with no other clear home.
 
-## 粒度控制
+## Granularity control
 
-初始化阶段宁可先生成粗粒度可用文档，也不要把每个类、表、接口、注解、hook、组件、流程节点都拆成单独文档。
+During init, prefer coarse usable docs over splitting every class, table, API, annotation, hook, component, or flow node into its own doc.
 
-- **文档总数随真实领域数量伸缩**：大项目有多少真实领域，就应该有多少篇 KB/Guide；十几几十篇都属正常。"少而准"约束的是**领域内的单篇粒度**，不是项目级总量上限。
-- 领域知识库粒度：按业务模块 / 业务领域 / 业务条线建，不按单个 Controller、Service、表、枚举、组件或 API 建。
-- Guide 粒度：按「同一套运行时机制 / 同一条隐藏流水线 / 同一种跨域工作场景」建，不按单个注解、decorator、AOP 切点、中间件或配置项建。
-- 隐藏机制合并规则：多个注解、代理、hook、上下文、配置共同服务于同一运行时流水线时，合并成一篇 Guide。
-- 拆 Guide 的门槛：影响两个以上业务域；修改时需要独立心智模型；有固定验证路径；忽略后会造成静默失败/错表/越权/数据不一致；内容放进单个 KB 会被多个 KB 重复引用。满足其一才新建 Guide。
-- 不拆的情况：只影响单个业务域、只是一张表/一个接口/一个字段/一个普通类的知识，写入对应领域知识库。
-- 历史故障和真实踩坑台账不由 doc-init 伪造；留给后续 `doc-update` 或 troubleshooting 文档沉淀。
+- **Doc count scales with real domain count:** as many KBs/Guides as real domains—dozens is normal. “Few and precise” constrains **per-domain single-doc granularity**, not a project-wide total cap.
+- Domain KB granularity: by business module / domain / line—not by single Controller, Service, table, enum, component, or API.
+- Guide granularity: by “same runtime mechanism / same hidden pipeline / same cross-domain work scenario”—not by single annotation, decorator, AOP pointcut, middleware, or config key.
+- Hidden-mechanism merge: when multiple annotations, proxies, hooks, contexts, configs serve one runtime pipeline, merge into one Guide.
+- Threshold to split a Guide: affects two+ business domains; needs an independent mental model to change; has a fixed validation path; ignoring it causes silent failure / wrong table / unauthorized access / data inconsistency; putting it in one KB would be duplicated across many KBs. Create a Guide when any one holds.
+- Do not split: single-domain impact, or knowledge of one table/API/field/ordinary class—write into the corresponding domain KB.
+- Historical incidents and real pitfall ledgers are not fabricated by doc-init; leave them to later `doc-update` or troubleshooting docs.
 
-## 领域地图完整性与待补充 backlog
+## Domain-map completeness and to-be-filled backlog
 
-领域地图是 doc-init Step 8 的**首要交付物**，在输出任何 per-域边界报告之前必须先产出。
+The domain map is Step 8’s **primary deliverable**—produce it before any per-domain boundary report.
 
-**地图格式**（表格或列表，每行一个领域）：
+**Map format** (table or list, one domain per row):
 
-| 领域名 | 证据锚点（目录 · 入口） | 状态 | 本次优先理由 / 待补充原因 |
+| Domain | Evidence anchors (dir · entry) | Status | Priority reason / why backlog |
 |--------|------------------------|------|--------------------------|
-| 渠道体系 | src/channels/ · ChannelHandler | 已生成（复用现有） | 已有 CHANNEL_GUIDE.md 覆盖 |
-| Agent 执行循环 | src/agents/ · AgentHarness | 本次深写 | 20+ 渠道依赖此核心域，Git 热点 |
-| 插件体系 | src/plugins/ · PluginRegistry | 待补充 | 架构独立，非本次用户优先关注域 |
-| 存储/状态 | src/storage/ · SQLite | 待补充 | 依赖核心域先理解 |
+| Channel system | src/channels/ · ChannelHandler | Generated (reuse existing) | CHANNEL_GUIDE.md already covers |
+| Agent execution loop | src/agents/ · AgentHarness | Deep-write this session | 20+ channels depend on this core; Git hotspot |
+| Plugin system | src/plugins/ · PluginRegistry | To be filled | Architecturally independent; not this session’s user priority |
+| Storage/state | src/storage/ · SQLite | To be filled | Depends on understanding core domains first |
 
-**领域地图规则**：
+**Domain-map rules:**
 
-- 锚定 `project_inventory.py` 的 `submodules` + 顶层目录 + `entry_candidates`，逐一判断是独立领域还是某个领域的子模块。
-- 建地图前先交叉比对 `docs/` 现有 `*_KNOWLEDGE_BASE.md` / `*_GUIDE.md` 和根 `AGENTS.md` 已有导航；已被现存文档覆盖的领域标「已生成（复用现有）」，不重新生成、不重写——只有内容明显过期或与代码冲突时才考虑更新并说明原因。
-- 每个领域给出证据锚点（最重要的目录或入口符号）；证据不足时标「待扫描」。
-- 状态三种之一：`已生成（复用现有）` / `本次深写` / `待补充`——没有"忽略"或"不做"。
-- 地图总数 = 已生成（复用 + 本次深写）+ backlog 登记数，Step 11 自评中必须明确给出这些数字并验证等于总数。
+- Anchor on `project_inventory.py` `submodules` + top-level dirs + `entry_candidates`; decide one by one whether each is an independent domain or a submodule of another.
+- Before building the map, cross-check existing `docs/` `*_KNOWLEDGE_BASE.md` / `*_GUIDE.md` and root `AGENTS.md` nav; domains already covered mark “Generated (reuse existing)”—do not regenerate/rewrite unless content is clearly stale or conflicts with code (then update and explain).
+- Each domain gets evidence anchors (most important dir or entry symbol); if evidence is thin, mark “pending scan”.
+- Status is one of: `Generated (reuse existing)` / `Deep-write this session` / `To be filled`—no “ignore” or “skip”.
+- Map total = generated (reuse + this session) + backlog count; Step 11 self-assessment must state these numbers and verify they equal the total.
 
-**本次深写主批的选取原则**：
-- 项目核心运行路径所在的领域（没有它其他域无法理解）；
-- Git 热点集中的域（改动频率高 = 改出 bug 的风险高）；
-- 用户 Intake 中点名"最常改、最容易出错"的模块；
-- 不设固定篇数上限也不设下限，由领域重要性驱动。
+**Selecting this session’s deep-write batch:**
 
-**待补充 backlog 写入规则**：
-- 使用 `upsert_agents_nav.py --backlog` 把每个待补充领域登记进根 `AGENTS.md` 的独立段 `## 待补充知识库（doc-init backlog）`。
-- 每条格式：`- [待补充] <领域名> KB/Guide —— 入口锚点：<目录>；触发场景：<改/排查某功能前>`。
-- 下次运行 doc-init 时，Step 6 会识别 backlog 段并继续深写，不再退避到 doc-compact。
+- Domains on the project’s core runtime path (without them other domains cannot be understood);
+- Domains concentrated in Git hotspots (high change frequency = high bug risk);
+- Modules the user named in Intake as “most often changed / most error-prone”;
+- No fixed upper or lower page count—driven by domain importance.
 
-**领域地图段是完成判定的锚点，但不是充分条件**：
+**Backlog write rules:**
 
-- 主批深写完成后（即使本次没有 backlog、已全部覆盖），必须把完整领域地图持久化进根 `AGENTS.md` 的 `## 领域地图（doc-init）` 段，段首带一行「覆盖度复核基线」戳记录当前源码指纹；这一步不可省略。
-- doc-init 判断"项目是否已初始化完成"**只能**以这个地图段为锚点，**绝不能**用"`docs/` 是否非空""已有几篇零散文档""文档导航条目数量"代替。
-- 但"地图段存在"只证明曾经初始化过，**不证明地图仍覆盖当前代码**。老项目的地图可能是一两年前写的，此后代码翻倍长出新领域。所以检测到地图段后，必须先跑 `scripts/doc_coverage.py` 覆盖度闸门（SKILL.md Step 6.5），用当前代码功能入口与地图锚点做机械匹配 + 源码指纹基线对比，退出码为 `COMPLETE` 才算真正完成；`STALE` 必须续写或刷新。完成判定 = 地图段存在 **且** 覆盖度闸门通过，两者缺一不可。
-- 已有零散文档（不论是旧版 doc-init 产物、人工写的、还是其他工具生成的）≠ 已初始化完成。没有领域地图段时，无论 `docs/` 里已经堆了多少文档，都必须视为"初始化未完成"，继续走扫描和生成流程（复用已有文档，不重写）。
-- `doc_nav_lint.py` 的 orphan-doc warning 数量、覆盖率等都只是参考信号，不能被当作"覆盖度已经是合理起点"这类收工或退避借口；覆盖度的权威判定走 `doc_coverage.py` 退出码，不靠模型自陈。
+- Use `upsert_agents_nav.py --backlog` to register each to-be-filled domain into root `AGENTS.md` section `## Pending knowledge bases (doc-init backlog)`.
+- Each item: `- [Pending] <domain> KB/Guide —— entry anchor: <dir>; trigger: <before changing/troubleshooting feature X>`.
+- On the next doc-init run, Step 6 recognizes the backlog section and continues deep-write—does not retreat to doc-compact.
 
-## 文件命名
+**The domain-map section is the completion anchor, but not sufficient alone:**
 
-文件名表达「业务域 / 机制入口」，不要表达分析过程或内部实现细节。避免 `HIDDEN`、`GUARDS`、`RUNTIME_SEMANTICS`、`ANNOTATION`、`AOP` 这类过窄词汇进入文件名；这些细节写进正文。
+- After the main deep-write batch (even with no backlog / full coverage), persist the full domain map into root `AGENTS.md` `## Domain map (doc-init)`, with a leading “coverage-review baseline” stamp of the current source fingerprint—this step is mandatory.
+- Whether “the project is initialized” may be judged **only** by this map section—**never** by “is `docs/` non-empty,” “how many scattered docs exist,” or “nav entry count.”
+- But “map section exists” only proves init once happened—**not** that the map still covers current code. Old maps may be years stale while code doubled and grew new domains. After detecting the map section, must first run `scripts/doc_coverage.py` coverage gate (SKILL.md Step 6.5): mechanically match current code function entries to map anchors + compare source fingerprint baseline; only exit code `COMPLETE` counts as truly done; `STALE` must continue writing or refresh. Completion = map section exists **and** coverage gate passes—both required.
+- Scattered existing docs (old doc-init, hand-written, or other tools) ≠ init complete. Without a domain-map section, however many docs sit under `docs/`, treat as “init incomplete” and continue scan/generate (reuse existing docs; do not rewrite).
+- `doc_nav_lint.py` orphan-doc warnings, coverage ratios, etc. are reference signals only—not excuses to finish or retreat claiming “coverage is already a reasonable starting point.” Authoritative coverage judgment is `doc_coverage.py` exit codes—not model self-claim.
 
-示例：LiteFlow 组件运行时机制应命名为 `LITEFLOW_COMPONENT_GUIDE.md`，不要命名为 `LITEFLOW_COMPONENT_HIDDEN_GUARDS_GUIDE.md`。
+## File naming
 
-只有当某个技术/框架在项目里只有一个主要工作入口，且短期看不到可拆分任务面时，才使用 `<TECH>_GUIDE.md` 总名。若父机制下面已有多个稳定工作入口，按任务面拆分命名，例如：
+Filenames express “business domain / mechanism entry,” not analysis process or internal implementation details. Avoid overly narrow words like `HIDDEN`, `GUARDS`, `RUNTIME_SEMANTICS`, `ANNOTATION`, `AOP` in filenames; put those details in the body.
 
-- `LITEFLOW_COMPONENT_GUIDE.md`：改组件、组件基类、组件运行时约束前读。
-- `LITEFLOW_NODES.md`：查节点 ID / 入参 / 出参 / 源码路径前读。
-- `BUSINESS_ACTION_GUIDE.md`：改业务动作启用校验前读。
+Example: LiteFlow component runtime mechanism → `LITEFLOW_COMPONENT_GUIDE.md`, not `LITEFLOW_COMPONENT_HIDDEN_GUARDS_GUIDE.md`.
 
-## 深度 vs 广度决策树
+Only when a tech/framework has one main work entry in the project and no short-term split task surface is visible, use a blanket `<TECH>_GUIDE.md`. If the parent mechanism already has multiple stable work entries, name by task surface, e.g.:
 
-doc-init 的时间和 token 预算有限。不要平均用力——按领域重要性分级投入深度：
+- `LITEFLOW_COMPONENT_GUIDE.md`: before changing components, base classes, or component runtime constraints.
+- `LITEFLOW_NODES.md`: before looking up node IDs / inputs / outputs / source paths.
+- `BUSINESS_ACTION_GUIDE.md`: before changing business-action enablement checks.
 
-| 领域分级 | 判定标准 | 深写深度 |
+## Depth vs breadth decision tree
+
+doc-init time and token budget are limited. Do not spread effort evenly—invest depth by domain importance:
+
+| Tier | Criteria | Deep-write depth |
 |---------|---------|---------|
-| 核心域 | Git 热点 Top 5 + 用户点名 + 产品核心循环所在 | 完整深写：§2-§7 全覆盖，§6 至少 5 条隐性约束，§7 必须有可执行验证命令 |
-| 标准域 | 有真实入口（Controller/Handler/CLI command），日常会改 | 标准写：§2-§4 + §6 至少 3 条隐性约束 + §7 至少有模板级验证路径 |
-| 边缘域 | 入口存在但低频变动、或辅助性质（工具类/配置/脚手架） | 登记 backlog，仅列入口锚点和一句话产品定位 |
+| Core | Git hotspot Top 5 + user-named + product core loop | Full deep-write: §2–§7 complete; §6 ≥ 5 hidden constraints; §7 must have executable validation commands |
+| Standard | Real entries (Controller/Handler/CLI command); changed in daily work | Standard write: §2–§4 + §6 ≥ 3 hidden constraints + §7 at least template-level validation paths |
+| Edge | Entries exist but low change frequency, or auxiliary (utils/config/scaffolding) | Register backlog only: entry anchors + one-line product positioning |
 
-**判定顺序**：先从 `depth_scanner.py` 的 `hot_files` 和用户 Intake 中确认核心域，再按入口密度和框架组件数量划分标准域和边缘域。
+**Order:** confirm core domains from `depth_scanner.py` `hot_files` and user Intake first, then split standard vs edge by entry density and framework-component count.
 
-**预算分配**：核心域占全部深写时间的 60%，标准域 30%，边缘域 10%（只登记不深写）。
+**Budget:** core 60% of deep-write time, standard 30%, edge 10% (register only, no deep-write).
 
-## 从骨架到血肉：渐进深写指导
+## From skeleton to flesh: progressive deep-write guidance
 
-doc-init 产出定位是「可用级初稿」——足以支撑 Agent 独立完成中等复杂度任务。深写质量闸门和深写回合制规范见 `document-templates.md`「深写规范」章节。
+doc-init output targets a “usable first draft”—enough for an Agent to finish medium-complexity tasks alone. Deep-write quality gates and round rules: `document-templates.md` “Deep-write standards”.
 
-**doc-init vs doc-update 分工**：
+**doc-init vs doc-update split:**
 
-| 内容类型 | doc-init 负责 | doc-update 负责 |
+| Content type | doc-init owns | doc-update owns |
 |---------|--------------|----------------|
-| 代码入口索引 | ✓ 初始建立 | 增量更新 |
-| 状态机/核心流程 | ✓ 从代码推导 | 补充边界 case |
-| 隐性约束 | ✓ 从模式识别提取候选 | 补充真实踩坑经验 |
-| 验证路径 | ✓ 模板级 | 补充真实命令和参数 |
-| 排障记录 | ✗ 不伪造 | ✓ 日常沉淀 |
-| 运维 SOP | ✓ 骨架（端口/启动/日志） | 补充环境差异和已知陷阱 |
+| Code entry index | ✓ initial build | incremental update |
+| State machines / core flows | ✓ derive from code | edge cases |
+| Hidden constraints | ✓ candidate extraction from patterns | real pitfall experience |
+| Validation paths | ✓ template-level | real commands and parameters |
+| Troubleshooting records | ✗ do not fabricate | ✓ daily persistence |
+| Ops SOP | ✓ skeleton (ports/start/logs) | env differences and known traps |
 
-**§9 置信度层级**：
+**§9 confidence levels:**
 
-| 层级 | 来源 | 示例 |
+| Level | Source | Examples |
 |------|------|------|
-| 高置信 | 代码/测试/配置直接推导 | 状态枚举值、表结构、接口路径 |
-| 中置信 | 代码模式推断未运行验证 | 状态转换方向、配置生效条件 |
-| 低置信/待补充 | 需用户经验或运行验证 | "为什么用这个字段"、异常处理策略 |
+| High | Directly from code/tests/config | Status enum values, schema, API paths |
+| Medium | Inferred from code patterns; not runtime-validated | Transition directions, config-effect conditions |
+| Low / to be filled | Needs user experience or runtime validation | “Why this field,” exception-handling strategy |
 
-**严禁伪造经验**：看不到的标「待补充」，不编造"常见问题"。depth_scanner.py 的模式只是候选信号，必须由模型确认后才写入 KB 正文。
+**Never fabricate experience:** mark unseen items “to be filled”; do not invent “common issues.” `depth_scanner.py` patterns are candidate signals only—write into KB body only after the model confirms them.
 
-## 非业务项目处理
+## Non-business projects
 
-并非所有项目都有“客户 / 支付 / 流程”这类业务域。若项目本质是 starter、SDK、插件、框架库、CLI 工具、脚手架或内部平台组件，不要硬套业务域知识库。
+Not every project has “customer / payment / flow” style domains. If the project is essentially a starter, SDK, plugin, framework library, CLI tool, scaffolding, or internal platform component, do not force business-domain KBs.
 
-- starter / SDK / 插件 / 框架库：优先生成 `*_GUIDE.md`，围绕“集成前读 / 修改机制前读 / 排查生效问题前读”组织；只有项目内确有稳定业务示例域时，才补充 `*_KNOWLEDGE_BASE.md`。
-- CLI / 工具型项目：按用户工作流或命令能力拆分知识入口，例如 `CLI_USAGE_GUIDE.md`、`REPOSITORY_ANALYSIS_GUIDE.md`。
-- 代码脚手架 / demo 项目：可以把示例域写成 KB，但必须明确它是模板示例，不是真实业务域；模板工程约束、站点结构、生成规则可放入 Guide 或条件生成的 `OPERATIONS_GUIDE.md`。
+- Starter / SDK / plugin / framework library: prefer `*_GUIDE.md` organized around “before integrating / before changing the mechanism / before troubleshooting effect”; add `*_KNOWLEDGE_BASE.md` only when there are stable in-repo business example domains.
+- CLI / tool projects: split knowledge entries by user workflow or command capability, e.g. `CLI_USAGE_GUIDE.md`, `REPOSITORY_ANALYSIS_GUIDE.md`.
+- Code scaffolding / demos: example domains may be KBs but must state they are template examples, not real business domains; template engineering constraints, site structure, generation rules may go into a Guide or conditionally generated `OPERATIONS_GUIDE.md`.
 
-## 非交互 / 预算受限模式
+## Non-interactive / budget-limited mode
 
-当用户明确说「不要提问」「测试模式」「干跑」「只输出报告」「不要写文件」「限制扫描文件数 / 文档数 / 预算」时，进入收敛模式，严格遵守用户给出的边界。
+When the user explicitly says “don’t ask,” “test mode,” “dry run,” “report only,” “don’t write files,” or “limit scanned files / docs / budget,” enter convergent mode and strictly respect those bounds.
 
-**两种克制要明确区分**：
-- **预算受限**（用户显式限制文件数/文档数/时间/禁止并行）：按用户上限压缩**深写数量**；但领域地图仍需完整枚举，超出预算的领域进 backlog，不得静默丢弃。
-- **大项目默认（用户未限制）**：完整地图 + 主批深写 + 完整 backlog，不因项目大而少列领域或少登记 backlog。
+**Distinguish two kinds of restraint:**
 
-其他收敛规则：
+- **Budget-limited** (user explicitly limits files/docs/time/forbids parallelism): compress **deep-write count** to the user cap; the domain map must still fully enumerate; domains beyond budget go to backlog—never silently drop.
+- **Large-project default (user did not limit):** full map + main-batch deep-write + full backlog; do not list fewer domains or backlog less because the project is large.
 
-- 用户要求不要修改全局指令文件时，阶段一只做完整性检查和报告。
-- 用户要求不要写文件时，只输出知识边界报告（含完整领域地图）和建议文档清单，不创建 `AGENTS.md`、`CLAUDE.md` 或 `docs/`。
-- 用户限制扫描文件数时，先列出候选文件并按入口价值排序，再只读取限制内的文件；未读内容写入「未覆盖 / 待补充」。
-- 用户限制文档数量时，优先生成根 `AGENTS.md`、项目根 `CLAUDE.md`，再生成最核心的 KB 或 Guide；剩余候选全部登记进 backlog 段（不是只在自评里提一句）。
-- 有费用 / token / 时间预算时，不启动不受控的全量扫描；优先产出完整领域地图和知识边界报告，再决定是否生成文档。
-- 用户禁止提问时，不进入 Intake 或 Q&A；代码看不到的信息统一写成「低置信度 / 待补充」，并在自评里列出风险空洞。
-- 用户禁止提问且存在多套业务叫法时，先选证据最强的主称谓并标低置信度；不要把多个叫法混写进正文。
+Other convergent rules:
+
+- If the user forbids modifying global instruction files, Phase 1 only does integrity check and report.
+- If the user forbids writing files, only output the knowledge-boundary report (with full domain map) and suggested doc list—do not create `AGENTS.md`, `CLAUDE.md`, or `docs/`.
+- If the user limits scanned file count, list candidates and rank by entry value first, then only read within the limit; unread content goes to “uncovered / to be filled.”
+- If the user limits doc count, prioritize root `AGENTS.md` and project root `CLAUDE.md`, then the most core KB or Guide; register all remaining candidates into the backlog section (not just a self-assessment mention).
+- With cost / token / time budget, do not start uncontrolled full scans; prioritize a complete domain map and knowledge-boundary report, then decide whether to generate docs.
+- If the user forbids questions, skip Intake and Q&A; write what code cannot see as “low confidence / to be filled” and list risk gaps in self-assessment.
+- If the user forbids questions and multiple business names exist, pick the strongest-evidence canonical term and mark low confidence; do not mix multiple names into body text.

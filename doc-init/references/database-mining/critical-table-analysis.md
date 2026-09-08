@@ -1,65 +1,65 @@
 # Critical Table Analysis
 
-关键表逐字段分析是本 skill 的核心价值。不要只列表名、主键和几个显眼字段；字段细微差异常常决定 AI 会不会写错代码。
+Per-field analysis of critical tables is the core value of this skill. Do not stop at table names, primary keys, and a few obvious columns; subtle field differences often decide whether AI writes wrong code.
 
-## 关键表判定
+## Critical-table criteria
 
-满足任一条件即优先进入关键表候选：
+Prefer a table as a critical-table candidate when any of these hold:
 
-- 当前业务域直接读写的主表、明细表、关系表、配置表、流程实例表。
-- 含金额、余额、积分、库存、状态、类型、权限、租户、分片、有效期、幂等键字段。
-- 代码里有复杂 SQL、XML Mapper、动态条件、手写 join、批量更新或异步补偿。
-- 从 catalog 看字段多、历史/日志/明细特征明显、字段注释少但业务风险高。
-- 字段真实值域和代码枚举、注释、命名存在不一致。
-- 多个领域共享的字典、配置、流程、分表或插件元数据表。
+- Primary tables, detail tables, relation tables, config tables, or process-instance tables that the current business domain reads and writes directly.
+- Columns involving amount, balance, points, inventory, status, type, permission, tenant, shard, validity period, or idempotency keys.
+- Code has complex SQL, XML mappers, dynamic conditions, handwritten joins, batch updates, or async compensation.
+- From the catalog: many columns, clear history/log/detail traits, sparse comments but high business risk.
+- Real value domains disagree with code enums, comments, or naming.
+- Dictionary, config, process, sharding, or plugin-metadata tables shared across domains.
 
-## 逐字段模板
+## Per-field template
 
-每个关键表字段都按以下结构分析；字段很多时可以分批，但必须标注未分析字段。
+Analyze every critical-table column with the structure below; batch when there are many columns, but always mark columns not yet analyzed.
 
 ```md
-### 字段：[column_name]
+### Field: [column_name]
 
-- 类型 / 约束：[type, nullable, default, index/unique/fk]
-- 字段注释：[db comment 或 无]
-- 代码读写入口：[Entity/Mapper/SQL/Service/Flow/Job]
-- 数据事实：[少量样本值、样本中的 NULL/空字符串/特殊 sentinel 值、枚举候选、时间格式、明显极值]
-- 业务判断：[字段真实语义；是否反常规；是否历史兼容]
-- AI 易错点：[忽略该字段会导致什么代码错误]
-- 置信度：[高/中/低；证据来源]
-- 落档位置：[目标 KB/Guide 章节]
+- Type / constraints: [type, nullable, default, index/unique/fk]
+- Column comment: [db comment or none]
+- Code read/write entry points: [Entity/Mapper/SQL/Service/Flow/Job]
+- Data facts: [a few sample values; NULL/empty string/special sentinel values in the sample; enum candidates; time formats; obvious extremes]
+- Business judgment: [real field semantics; any unconventional design; historical compatibility]
+- AI pitfalls: [what code mistakes follow from ignoring this field]
+- Confidence: [high/medium/low; evidence sources]
+- Doc target: [target KB/Guide section]
 ```
 
-## 必须关注的字段类型
+## Field types that must get attention
 
-- 状态 / 类型：样本中是否出现代码枚举外的历史值、灰度值、废弃值；必要时再做字段级点查。
-- 金额 / 数量 / 积分：单位、精度、正负号、冻结/可用/累计口径。
-- 时间：创建时间、生效时间、过期时间、核销时间、业务日；`NULL` 和极大日期是否有特殊语义。
-- 软删除 / 有效标记：删除值、有效值、历史数据是否反向。
-- 租户 / 品牌 / 门店 / 方案：隔离键、分片键、默认租户或全局值。
-- 幂等 / 外部单号：唯一性、重复提交、补偿链路。
-- JSON/text 配置：key 结构、开关、表达式、流程节点参数。
-- 扩展字段：看似备用字段但已有真实业务值时必须记录。
+- Status / type: whether the sample contains historical, canary, or deprecated values outside code enums; do field-level spot checks when needed.
+- Amount / quantity / points: unit, precision, sign, frozen/available/cumulative semantics.
+- Time: create time, effective time, expire time, redemption time, business day; whether `NULL` and extreme dates have special meaning.
+- Soft delete / validity flags: deleted values, valid values, whether historical data is inverted.
+- Tenant / brand / store / plan: isolation keys, shard keys, default tenant or global values.
+- Idempotency / external order IDs: uniqueness, duplicate submit, compensation chains.
+- JSON/text config: key structure, switches, expressions, process-node parameters.
+- Extension columns: record them when they look unused but already hold real business values.
 
-## 反常规语义
+## Unconventional semantics
 
-以下情况要优先写成 AI 易错点：
+Prioritize these as AI pitfalls:
 
-- 字段名表达 A，真实数据或代码语义表达 B。
-- `NULL`、`0`、`-1`、空字符串、`9999-12-31` 等 sentinel 值有业务含义。
-- 主表字段只是缓存/冗余，真实校验口径在明细表。
-- 代码枚举可能不是全量，样本或字段点查发现数据库保留历史值。
-- 字段注释过时，真实数据分布和注释相反。
-- 无外键但业务上强关联，或有外键但代码不按外键口径使用。
+- The column name says A, but real data or code semantics say B.
+- Sentinel values like `NULL`, `0`, `-1`, empty string, or `9999-12-31` carry business meaning.
+- A main-table column is only cache/redundancy; the real validation semantics live on a detail table.
+- Code enums may be incomplete; samples or field spot checks show the database keeps historical values.
+- Column comments are stale; the real distribution contradicts the comment.
+- No FK but a strong business association, or an FK exists but code does not use FK semantics.
 
-## 弱关系推断
+## Weak-relationship inference
 
-弱关系只能作为候选，不得写成外键事实。证据包括：
+Weak relationships are candidates only—never write them as FK facts. Evidence includes:
 
-- 字段名匹配：`*_id`、`*_code`、`tenant_id`、`prog_id`。
-- 数据覆盖：字段值大量出现在另一表主键/唯一键中。
-- 索引组合：多列共同表达业务唯一性。
-- 代码 join：Mapper、SQL、ORM relation 或 service 查询顺序。
-- 表命名：主表/明细表/日志表/历史表/关系表/扩展表。
+- Name matches: `*_id`, `*_code`, `tenant_id`, `prog_id`.
+- Data coverage: column values largely appear as another table’s primary/unique key.
+- Index combinations: multiple columns jointly express business uniqueness.
+- Code joins: Mapper, SQL, ORM relation, or service query order.
+- Table naming: main/detail/log/history/relation/extension tables.
 
-输出时必须写清置信度和证据来源。
+When outputting, always state confidence and evidence sources.

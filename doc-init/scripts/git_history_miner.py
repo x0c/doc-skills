@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""轻量 Git 历史弱信号挖掘工具。"""
+"""Lightweight Git-history weak-signal miner."""
 
 from __future__ import annotations
 
@@ -279,7 +279,7 @@ def load_commits(root: Path, max_commits: int, paths: list[str]) -> tuple[list[d
         args.extend(["--", *paths])
     proc = run_git(root, args)
     if proc.returncode != 0:
-        return [], proc.stderr.strip() or "git log 执行失败"
+        return [], proc.stderr.strip() or "git log failed"
     commits = parse_git_log(proc.stdout)
     if not paths:
         filtered: list[dict[str, Any]] = []
@@ -352,13 +352,13 @@ def summarize(commits: list[dict[str, Any]], paths: list[str], max_items: int) -
 
     qa_prompts: list[str] = []
     if term_candidates:
-        top_terms = "、".join(item["term"] for item in term_candidates[:5])
+        top_terms = ", ".join(item["term"] for item in term_candidates[:5])
         qa_prompts.append(
-            f"Git 历史里出现这些叫法：{top_terms}。它们和当前代码/表/接口中的叫法是否指同一概念？最终文档正文统一用哪个？"
+            f"Git history uses these names: {top_terms}. Do they match current code/table/API names for the same concept? Which term should the final docs standardize on?"
         )
     for hit in keyword_hits[:5]:
         qa_prompts.append(
-            f"提交 {hit['hash']} 提到「{hit['subject']}」。当前仍存在对应兼容/修复约束吗？AI 改相关代码时必须保留什么？"
+            f"Commit {hit['hash']} mentions 「{hit['subject']}」. Do matching compatibility/fix constraints still apply? What must AI preserve when changing related code?"
         )
 
     domain_path_summaries = []
@@ -412,7 +412,7 @@ def unavailable(root: Path, reason: str, max_commits: int, paths: list[str]) -> 
             "paths_filter": paths,
             "scanned_commits": 0,
         },
-        "weak_signal_policy": "Git 历史是高噪声弱信号，只能用于热点、历史叫法和 Q&A 线索。",
+        "weak_signal_policy": "Git history is a high-noise weak signal; use only for hotspots, historical names, and Q&A leads.",
         "hot_paths": [],
         "hot_directories": [],
         "keyword_hits": [],
@@ -425,9 +425,9 @@ def unavailable(root: Path, reason: str, max_commits: int, paths: list[str]) -> 
 
 
 def empty_history(root: Path, reason: str, max_commits: int, paths: list[str], shallow: bool | None) -> dict[str, Any]:
-    report = unavailable(root, "Git 历史为空或路径过滤后没有提交", max_commits, paths)
+    report = unavailable(root, "Git history empty or no commits after path filter", max_commits, paths)
     report["scan"]["git_available"] = True
-    report["scan"]["status"] = "Git 历史为空或路径过滤后没有提交"
+    report["scan"]["status"] = "Git history empty or no commits after path filter"
     report["scan"]["shallow_repository"] = shallow
     report["notes"] = [reason]
     return report
@@ -437,7 +437,7 @@ def build_report(root: Path, max_commits: int, paths: list[str], max_items: int)
     root = root.resolve()
     inside = run_git(root, ["rev-parse", "--is-inside-work-tree"])
     if inside.returncode != 0 or inside.stdout.strip() != "true":
-        return unavailable(root, "当前目录不是 Git 工作树", max_commits, paths)
+        return unavailable(root, "current directory is not a Git work tree", max_commits, paths)
 
     shallow_proc = run_git(root, ["rev-parse", "--is-shallow-repository"])
     shallow = shallow_proc.stdout.strip() == "true" if shallow_proc.returncode == 0 else None
@@ -449,14 +449,14 @@ def build_report(root: Path, max_commits: int, paths: list[str], max_items: int)
             return empty_history(root, error, max_commits, paths, shallow)
         return unavailable(root, error, max_commits, paths)
     if not commits:
-        return empty_history(root, "Git 历史为空或路径过滤后没有提交", max_commits, paths, shallow)
+        return empty_history(root, "Git history empty or no commits after path filter", max_commits, paths, shallow)
 
     summary = summarize(commits, paths, max_items)
     notes = [
-        "Git 历史只作为弱信号，不得单独写成当前业务规则。",
+        "Git history is a weak signal only; do not write it alone as current business rules.",
     ]
     if shallow:
-        notes.append("当前仓库是浅克隆，Git 弱信号覆盖不足。")
+        notes.append("Repository is a shallow clone; Git weak-signal coverage is incomplete.")
 
     return {
         "scan": {
@@ -470,19 +470,19 @@ def build_report(root: Path, max_commits: int, paths: list[str], max_items: int)
             "effective_paths_filter": effective_paths,
             "scanned_commits": len(commits),
         },
-        "weak_signal_policy": "Git 历史是高噪声弱信号，只能用于热点、历史叫法和 Q&A 线索；需要代码、数据库、运行时或用户确认后才能落入 KB/Guide。",
+        "weak_signal_policy": "Git history is a high-noise weak signal; use only for hotspots, historical names, and Q&A leads; promote into KB/Guide only after code/DB/runtime or user confirmation.",
         **summary,
         "notes": notes,
     }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="轻量 Git 历史弱信号挖掘工具")
-    parser.add_argument("--root", default=".", help="项目根目录，默认当前目录")
-    parser.add_argument("--max-commits", type=int, default=300, help="最多扫描最近多少条提交，默认 300")
-    parser.add_argument("--max-items", type=int, default=20, help="每类最多输出多少条摘要，默认 20")
-    parser.add_argument("--paths", nargs="*", default=[], help="可选：只扫描指定路径")
-    parser.add_argument("--output", help="输出 JSON 文件路径；不传则打印到 stdout")
+    parser = argparse.ArgumentParser(description="Lightweight Git-history weak-signal miner")
+    parser.add_argument("--root", default=".", help="project root (default: cwd)")
+    parser.add_argument("--max-commits", type=int, default=300, help="max recent commits to scan (default 300)")
+    parser.add_argument("--max-items", type=int, default=20, help="max summary items per category (default 20)")
+    parser.add_argument("--paths", nargs="*", default=[], help="optional: only scan these paths")
+    parser.add_argument("--output", help="output JSON path; default stdout")
     return parser.parse_args()
 
 

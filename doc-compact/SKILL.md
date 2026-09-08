@@ -1,141 +1,182 @@
 ---
 name: doc-compact
-description: 文档整理与压缩。核心职责是在不丢行为信息的前提下压缩冗余文档——删复述、删死链、删历史沿革、收敛重复提醒；配套完成结构整理（纠正文档放置、重建根 AGENTS.md 索引、补 inline 指针、规范 CLAUDE.md 为单行 @*.md、判定并拆分过大项目的二级索引）和全局文档管理规范的检查/安装。当文档冗余膨胀、索引失效、AGENTS.md 膨胀、CLAUDE.md 混入杂质，或需要确认全局规范是否写清文档管理模式时使用。
+description: Document cleanup and compression. Core job is compressing redundant docs without losing behavioral information—drop restatement, dead links, historical narrative, and duplicate reminders; also fix structure (placement, rebuild root AGENTS.md index, add inline pointers, normalize CLAUDE.md to a single `@*.md` line, decide and split secondary indexes for oversized projects) and check/install global doc-governance rules. Use when docs are bloated, indexes are broken, AGENTS.md is swollen, CLAUDE.md has junk, or you need to confirm global instructions spell out the doc management model.
 ---
 
 # doc-compact
 
-执行前先探测实际生效的文件，不硬编码路径。
-`<DOC_INIT_DIR>` 默认与本 skill 同级：`<本 SKILL.md 所在目录>/../doc-init`
+**Document language:** Follow existing project docs / user language when writing; default English if unclear. Do not set language policy that conflicts with global AGENTS. This skill must NOT inject language/memory/review rules into `insert_doc_governance` managed blocks.
 
-## 流程
+Before running, discover the files that are actually in effect—do not hardcode paths.
+`<DOC_INIT_DIR>` defaults to a sibling of this skill: `<directory of this SKILL.md>/../doc-init`
 
-**Step 1 校验全局规范 → Step 2 只读审计 → Step 3 判定二级索引 → Step 4 修复结构 → Step 5 压缩（核心，不可跳过）→ Step 6 验证**
+## Flow
+
+**Step 1 validate global rules → Step 2 read-only audit → Step 3 decide secondary indexes → Step 4 fix structure → Step 5 compress (core, non-skippable) → Step 6 verify**
 
 ---
 
-## Step 1 — 全局规范
+## Step 1 — Global rules
 
-**目标文件仅限全局 AI 指令文件**，绝不能传项目 `AGENTS.md`：
+**Target files are global AI instruction files only**—never pass a project `AGENTS.md`:
 
 ```bash
-# 探测全局 AI 指令文件真身（软链则跟到真身）
+# Discover the real global AI instruction file (follow symlinks to the real path)
 for f in ~/.claude/CLAUDE.md ~/.codex/AGENTS.md ~/.codex/instructions.md ~/.config/opencode/AGENTS.md; do
   [ -f "$f" ] && readlink -f "$f" 2>/dev/null || echo "$f"
 done | sort -u
 ```
 
-对每个存在的全局文件运行：`python3 <DOC_INIT_DIR>/scripts/insert_doc_governance.py <全局文件路径>`。
-`[跳过]` = 已最新；`[新增/升级]` = 已写入，扫一遍其余章节删旧约定。
-`<DOC_INIT_DIR>` 不存在时：逐条对照 `references/standard.md` 手工比对，报告中注明「未自动校验」。
+For each existing global file, run: `python3 <DOC_INIT_DIR>/scripts/insert_doc_governance.py <global-file-path>`.
+`[跳过]` / skip = already current; `[新增/升级]` / added/upgraded = written—scan remaining sections and remove stale local conventions.
+If `<DOC_INIT_DIR>` is missing: compare manually against `references/standard.md` item by item, and note “not auto-validated” in the report.
 
-**禁止**把当前项目的 `AGENTS.md` 传给 `insert_doc_governance.py`——项目 `AGENTS.md` 存放项目规范，不是全局 AI 指令文件，写入会污染项目文档。
+**Do not** pass the current project’s `AGENTS.md` to `insert_doc_governance.py`—project `AGENTS.md` holds project rules, not global AI instructions; writing into it pollutes project docs.
 
-## Step 2 — 只读审计
+## Step 2 — Read-only audit
 
-运行 `python3 scripts/audit.py [项目根]`，一次跑完机器可判的检查：
+**Multi-component monorepo (no root `docs/`; docs live in sub-repos):** first find subdirectories that contain `docs/` or `specs/` and also `AGENTS.md` (skip `worktrees` / `node_modules` / `.git`), and run `audit.py` on **each** doc host; at the root only check CLAUDE/`AGENTS` size and navigation pointers. Do not audit only the repo root and miss `backend/docs`, `client-web/docs`, etc.
 
-- **A** CLAUDE.md 全单行 `@*.md`
-- **B** 无悬空 `@AGENTS.md`
-- **C** 无裸 `OVERVIEW.md`/`INDEX.md`；具名 `<DOMAIN>_INDEX.md` 合法
-- **D** AGENTS.md 行数（> 500 行 → Step 3）
-- **E** 无孤儿文档（docs/specs 下未被根 AGENTS.md ∪ README ∪ `*_INDEX.md` 引用）
-- **F** 文件命名合规（排查 `YYYY-MM-DD-*`，review `*-review.md`）
-- **G** 预置折叠建议（排查 / Review 台账 ≥3 篇，建议性）
-- **H** doc-init 联动：反向全局引用、领域地图段存在性 → **影响 Step 4/5 保护边界**
-- **I** §2.5 路径存活性：对含 `§2.5 物理路径速查` 的 KB，`ls` 验证每行路径是否仍存在；STALE 路径纳入 Step 5 清理（详见 `compression-guide.md` §2.5 路径存活性验证）
-- **J** AGENTS.md 膨胀度量化（字符/估算 token/规则条数/强调词密度）与托管块识别：成对 `<!-- 名字:begin/end -->` 标记的块列为🔒托管块（Step 4 索引重建时原样保留，不压不删）；未配对标记报❌。只认这一种 markdown 标准注释约定，其他样式交给 agent 自行判断
+Run `python3 scripts/audit.py [project-root or sub-repo root]` to finish machine-checkable items in one pass:
 
-Step 2 顺手加 `--save-metrics <基线路径>` 保存 AGENTS.md 量化基线，Step 6 用 `--compare-metrics` 出压缩前后对比（估算 token 上升会标 ⚠，须在收工报告说明原因）。
+- **A** Every CLAUDE.md is a single `@*.md` line
+- **B** No dangling `@AGENTS.md`
+- **C** No bare `OVERVIEW.md`/`INDEX.md`; named `<DOMAIN>_INDEX.md` is valid
+- **D** AGENTS.md line count (> 500 lines → Step 3)
+- **E** No orphan docs (under docs/specs not referenced by root AGENTS.md ∪ README ∪ `*_INDEX.md`)
+- **F** File naming compliance (troubleshooting `YYYY-MM-DD-*`, review `*-review.md`)
+- **G** Preset fold suggestions (troubleshooting / Review ledgers ≥3 docs, advisory; includes `operations/` incident candidates—see Step 3)
+- **H** doc-init linkage: reverse global refs, domain-map section presence → **affects Step 4/5 protection boundaries**
+- **I** §2.5 path liveness: for KBs that contain `§2.5 物理路径速查` / physical path quick-lookup, `ls` each listed path; STALE paths go into Step 5 cleanup (see `compression-guide.md` §2.5 path liveness)
+- **J** AGENTS.md bloat metrics (chars / estimated tokens / rule count / emphasis density) and managed-block detection: paired `<!-- name:begin/end -->` markers are listed as 🔒 managed blocks (preserve verbatim on Step 4 index rebuild—do not compress or delete); unpaired markers report ❌. Only this markdown HTML-comment convention is recognized; other styles are left to agent judgment
 
-人工补充检查：文档放置是否错位、是否冗余膨胀、是否存在易变事实跨文档复述（`grep -rn "具体数字" docs/`，命中 >2 处即疑似）。
+In Step 2 also pass `--save-metrics <baseline-path>` to save the AGENTS.md metrics baseline; Step 6 uses `--compare-metrics` for before/after (estimated token increases get ⚠ and must be explained in the close-out report).
 
-### 受保护段
+Human follow-ups: misplaced docs, redundant bloat, volatile facts restated across docs (`grep -rn "concrete number" docs/`; >2 hits is suspicious).
 
-H 显示 `domain_map_present=True` 时，根 AGENTS.md 里的 `## 领域地图（doc-init）` 和 `## 待补充知识库（doc-init backlog）` 两段**原样保留**，不压缩、不折叠、不删除。
+### Protected sections
 
-## Step 3 — 判定二级索引
+When H shows `domain_map_present=True`, keep the root AGENTS.md sections `## 领域地图（doc-init）` / Domain map (doc-init) and `## 待补充知识库（doc-init backlog）` / Knowledge-base backlog (doc-init) **verbatim**—do not compress, fold, or delete them.
 
-默认单层平铺。**能不做就不做**——多一跳，漏读概率累加。
+## Step 3 — Decide secondary indexes
 
-两条独立触发（满足其一即应折叠）：
+Default is a single flat layer. **Prefer not to add levels**—each extra hop multiplies miss-read risk.
 
-**① 规模驱动**：导航占 AGENTS.md ≳ 1/2，或规则被挤到文件后半（主判据）；兜底：> 500 行且导航占相当篇幅。
-拆法：根只保留「任务域索引入口」（每域一行），明细下沉到具名 `<DOMAIN>_INDEX.md`。
+Two independent triggers (either one justifies folding):
 
-**② 类型驱动**：
-- 排查记录 ≥3 篇 → 折叠到 `docs/troubleshooting/TROUBLESHOOTING_INDEX.md`
-- Review 台账 ≥3 篇 → 折叠到 `docs/reviews/REVIEW_INDEX.md`
-- 强路由须含「何时跳过 / 是否权威源」，不能只是干瘪文件名
+**① Size-driven:** navigation occupies ≳ 1/2 of AGENTS.md, or rules are pushed into the second half of the file (primary criterion); fallback: > 500 lines with substantial navigation.
+How to split: root keeps only “task-domain index entry” lines (one per domain); details move to named `<DOMAIN>_INDEX.md`.
 
-## Step 4 — 修复结构
+**② Type-driven:**
+- Troubleshooting records ≥3 → fold into `docs/troubleshooting/TROUBLESHOOTING_INDEX.md`
+- Review ledgers ≥3 → fold into `docs/reviews/REVIEW_INDEX.md`
+- Strong routes must include “when to skip / whether this is the authority”—not just bare filenames
 
-- **CLAUDE.md**：非单行 → 改回 `@AGENTS.md`；只剩注入块无内容 → 连同悬空 CLAUDE.md 一并删
-- **文档命名/放置**：对齐规范（知识库/指南 `SCREAMING_SNAKE_CASE`，设计/review `kebab-case`，排查 `YYYY-MM-DD-*`）；移位/改名先列清单确认，再搜全仓引用同步
-- **导航描述**：逐条检查是「何时该读」还是「它讲了什么」，后者路由效果差，改写为前者；触发条件覆盖全部任务类型（改/新建/评审/排查/优化）
-- **索引重建**：只列真实文档，按领域聚类、高频在前；删死链/空占位；受保护段跳过
-- **注入块/裸索引**：① 读块内容识别规则；② 对照 AGENTS.md 逐条判断是否已覆盖；③ 未覆盖的提炼后并入；④ 删整个注入块
+**Incident docs outside `troubleshooting/` still count toward the ledger (AlphaForge 2026-09-05):** many repos put incidents under `docs/operations/` (`*incident*` / `*outage*` / `YYYY-MM-DD-*.md`). `audit.py` check G sums operations incident candidates with troubleshooting against the threshold—**humans still fold by type**. Prefer a **pointer-style** `TROUBLESHOOTING_INDEX.md` (symptom → authoritative original path); **do not relocate files by default** (relocation = high-risk whole-repo reference sync). Leave originals in `operations/`; the index must state “authority is the original; when the index may be skipped.”
 
-## Step 5 — 压缩（核心交付，不可跳过）
+## Step 4 — Fix structure
 
-完整压缩判据和操作指南见 [`references/compression-guide.md`](references/compression-guide.md)，执行前必读（主 agent 读一遍，作为注入材料传给 subagent）。
+- **CLAUDE.md:** not a single line → restore `@AGENTS.md`; only an injection block with no content → delete the dangling CLAUDE.md too
+- **Doc naming/placement:** align with rules (knowledge bases/guides `SCREAMING_SNAKE_CASE`, design/review `kebab-case`, troubleshooting `YYYY-MM-DD-*`); list moves/renames for confirmation first, then sync whole-repo references
+- **Navigation blurbs:** check each line is “when to read” vs “what it is about”—the latter routes poorly; rewrite to the former; triggers must cover all task types (change / create / review / troubleshoot / optimize)
+- **Index rebuild:** list only real docs, cluster by domain, high-frequency first; drop dead links/empty placeholders; skip protected sections; preserve 🔒 managed blocks from J verbatim
+- **Injection blocks / bare indexes:** ① read the block and identify rules; ② check coverage against AGENTS.md item by item; ③ merge uncovered items after distillation; ④ delete the whole injection block
+- **`managed:inherited-agents` (Codes + local `sync-agent-files`):** **do not** delete as “leftover tool injection”—`pre-commit` will reinject the whole block on the next commit. Fix dead links by changing the **product-root** navigation to absolute paths (see global `docs/WORKSPACE_ORGANIZATION_GUIDE.md`), not by clearing the block. If audit C lists this block, treat it as expected (C already exempts the marker; J lists it as a 🔒 managed block).
+- **`managed:inherited-agents` (repos without reinjection hooks):** delete the injection only when child-repo-specific rules already supersede parent rulings; before delete, confirm hard rulings remain reachable from the child’s required-read entry points. Do not leave parent paths (`backend/docs/...`) verbatim in child body text as dead links.
 
-**不可协商的约束**：
+## Step 5 — Compress (core deliverable, non-skippable)
 
-- 每篇 docs/specs 文档逐篇过判据，不可静默跳过；收工汇报必须给出逐篇账目（前 N 行 → 后 M 行，或「已审无可压，原因：xxx」）
-- 主 agent 不直接压文档正文，逐篇压缩分发 subagent 并行做；主 agent 上下文只装「分片方案 + 判据清单 + 回传账目」
-- subagent 必须注入三样：① compression-guide.md 全文（判据基准）；② 本项目受保护段清单（根 AGENTS.md「领域地图」「待补充知识库」段、KB 的 `§0 目录索引` / `§1.5 架构概览` mermaid / `§2.5 物理路径速查`、方法名锚定引用——不可删不可压）；③ 高风险清单（即下方「先列清单确认」五项，subagent 不得擅自执行，回传主 agent 裁定）。缺这三样，多 subagent 并行压出来的判据漂移比单 agent 串行更严重
-- subagent 只动 `docs/` 下自己分到的文档，不碰根 AGENTS.md / 导航 / 索引——索引重建与全仓引用同步是全局视角，主 agent 在 Step 4 串行做
-- 账目回传后，主 agent 按 guide「subagent 并行压缩的漂移防护」章做跨片一致性回检（判据发散、跨片易变事实、受保护段误压），高风险项统一裁定后回传落地
+Full compression criteria and playbook: [`references/compression-guide.md`](references/compression-guide.md)—required reading before execution (main agent reads once; pass as injection material to subagents).
 
-**分片方案**（确定性算术，交给脚本；预算默认 90k token/片，系 128K 窗口实测净预算，其他窗口用 `--budget` 按比例折算）：
+**Non-negotiable constraints:**
 
-```bash
-python3 scripts/plan_shards.py <项目根>                          # 逐篇 token 估算 + 大 KB 清单 + 按目录草稿分组
-python3 scripts/plan_shards.py <项目根> --domain-map <map.json> # 最终装箱：主 agent 按领域聚类后手写 map 传入
-```
+- Every docs/specs document must pass the criteria; silent skips are forbidden; the close-out report must give a per-doc ledger (was N lines → now M lines, or “reviewed, nothing compressible, reason: xxx”)
+- By default the main agent does not compress doc bodies directly—per-doc compression is dispatched to subagents in parallel; main-agent context holds only “shard plan + criteria checklist + returned ledgers”. Fallback when sharding fails: see “Subagent model and quota-failure fallback” below
+- Subagents must be injected with three things: ① full compression-guide.md (criteria baseline); ② this project’s protected-section list (root AGENTS.md domain-map and KB-backlog sections; KB `§0` TOC / `§1.5` architecture mermaid / `§2.5` physical path quick-lookup; method-name anchors; 🔒 managed blocks from J—do not delete or compress); ③ high-risk list (the five “list first, confirm” items below—subagents must not execute them unilaterally; return to main agent for ruling). Without these three, criteria drift across parallel subagents is worse than serial single-agent runs
+- Subagents only touch docs assigned to them under `docs/` (and this repo’s `specs/`); they must not touch root AGENTS.md / navigation / indexes—index rebuild and whole-repo reference sync are a global view, done serially by the main agent in Step 4
+- After ledgers return, the main agent runs the guide’s “Drift protection for parallel subagent compression” chapter for cross-shard consistency (criteria divergence, cross-shard volatile facts, protected-section mishaps); unify high-risk rulings, then send back for landing
 
-- 聚类按领域不按物理目录：同领域文档共享术语、状态机与约束，交给同一 subagent 判据最一致、跨文档去重最易发现。同领域不拆（超预算除外）；预算富余时主 agent 可把多个小领域合并进同一 map 条目，避免为小领域白开 subagent
-- 大 KB（单篇 > 20k token）由脚本自动判定，各独占一个 subagent
-- 新项目首跑抽 3-5 篇实测校正字符→token 系数（脚本默认按内容构成自适应选 0.40/0.47/0.55，偏差大时 `--coef` 统一覆盖）
-
-**执行分级**：
-- **低风险，直接做**：复述 / 死链 / 历史沿革 / 空占位 / 重复提醒 / 行号引用（「第 N 行」「Line N」→ 先 Read 确认方法名，再替换为 `类名.方法名()` 锚定）/ 形式转化（叙述段→调用链/表格/决策表，信息不减只是换形式）（汇报列出即可）
-- **高风险，先列清单确认**：删整篇、成段重写、拆并索引结构、删改含数字/边界条件正文、删 §0/§1.5/§2.5 章节
-- **发现异常，顺手修复（禁止推迟）**：压缩中发现的文档异常——章号跳号/重复、重复小节标题、渲染破裂的表格、悬空 § 引用、小节乱序、表名/类名/路径疑似与代码不符、跨文档重复未收敛——一律本轮修复，禁止以「移交 doc-update」「下次统一处理」推迟。分级：单文件内可修且不改变其他章节编号的（重复标题、断表、文内悬空引用）由 subagent 直接修；会波及外部引用的（跳号重排、小节重排、改名）回传主 agent，主 agent grep 全仓引用后当场修并同步；事实存疑的对照源码（实体类 / @TableName / 目录结构）验证后修。判定细则与处置表见 guide「发现异常顺手修复」章
-
-**近 30 天已压过的文档**（文末压缩标识 < 30 天）默认跳过，报告标「近期已压」；仍需重压（代码变动导致新增内容）时的漂移防护见 guide。
-
-**压缩标识**：每篇处理完后在文件真正末尾追加 `<!-- 该文档整理/压缩于 YYYY-MM-DD -->`，批量写入脚本见 guide。
-
-## Step 6 — 验证
+**Shard plan** (deterministic arithmetic, scripted; default budget 90k tokens/shard = measured net budget for a 128K window; other windows scale with `--budget`):
 
 ```bash
-# Step 2 存基线：audit.py <项目根> --save-metrics /tmp/dc-metrics.json
-# Step 6 验证：
-python3 scripts/audit.py <项目根> --compact-date <今日 YYYY-MM-DD> --compare-metrics /tmp/dc-metrics.json
+# Must exclude .worktrees / build caches; do not count worktree copies as product docs (script already prunes)
+python3 scripts/plan_shards.py <project-root>                          # per-doc token estimate + large-KB list + directory draft groups
+python3 scripts/plan_shards.py <project-root> --domain-map <map.json> # final packing: main agent clusters by domain, writes map, passes it in
 ```
 
-检查 I（压缩标识硬闸门）**必须 `压缩缺标识=0`** 才能收尾。任何缺标识文档 = 本轮漏审，补完重跑。若上轮全量压缩距今 < 30 天（多数文档被 Step 5 跳过），脚本的「当日标识」口径会误报——真实闸门为：每篇文档要么带本轮当日标识、要么带 30 天内的旧标识（即「今日标识 ∪ 近 30 天标记 = 全集」，主 agent 自行校验），两者皆无才是漏审（2026-08-28 mc-mdcrm 实跑确立）。
-检查 J 对比中 AGENTS.md 估算 token 高于基线的，须在收工报告说明原因（如用户本轮明确要求加内容）——不能默默膨胀。
-托管块清单（🔒）须在收工报告里逐个确认仍原样在位。
-H 的 `domain_map_present` / `backlog_present` 不应因本次审计由 True 变 False。
-审计项 I 的 STALE 路径若已在 Step 5 中清理，验证时应为 0；否则说明遗漏。
+- Cluster by domain, not physical directory: same-domain docs share terms, state machines, and constraints—one subagent keeps criteria most consistent and finds cross-doc dedup easiest. Do not split a domain (except over budget); when budget allows, the main agent may merge several small domains into one map entry to avoid spinning a subagent for a tiny domain
+- Large KBs (single doc > 20k tokens) are auto-detected by the script and each get their own subagent
+- On a new project’s first run, sample 3–5 docs to calibrate chars→token coefficient (script defaults adaptively pick 0.40/0.47/0.55 by content mix; override with `--coef` when far off)
 
-**§0 目录索引完整性**：含 KB 模板的文档（`*_KNOWLEDGE_BASE.md`）应有 `§0 目录索引`。缺失的**本轮顺手补齐**（从各级标题机械生成，属低风险直接做），收工报告列出补齐清单，不推迟。
+**Coefficient source (measured, not guessed):** sample of 14 docs from the mc-mdcrm repo, `tiktoken cl100k_base` weighted average = **0.47** (narrative-dense 0.55–0.60; code/table-dense 0.29–0.45). Details in the `plan_shards.py` header comment.
 
----
+**Budget accounting (measured on a 128K window):**
 
-## 安全边界
+| Item | 128K-window subagent |
+|------|----------------------|
+| Total window | 128k |
+| Minus: compression-guide.md injection | ~5k |
+| Minus: protected sections + high-risk list + domain context | ~7k |
+| Minus: thinking + per-doc ledger output reserve | ~18k |
+| **Net budget per shard (original docs + compressed output)** | **≈ 90k tokens** |
 
-- **不裁定内容真相**：两份文档结论矛盾且无代码证据可裁定时，不自行判定谁对，报告里记录并请用户裁定——这是唯一允许留到收工报告的「不修」，与「顺手修复」的区别在于：异常能靠代码/引用核查修的就修，矛盾只能靠人拍板的才上交
-- **不碰**：第三方/vendored 项目、构建产物、备份目录、git worktree
+**Execution tiers:**
+- **Low risk, do directly:** restatement / dead links / historical narrative / empty placeholders / duplicate reminders / line-number refs (“line N” / “Line N” → Read first to confirm method name, then replace with `ClassName.method()` anchors) / form conversion (narrative → call chains / tables / decision tables; information unchanged, form only) (list in the report)
+- **High risk, list first then confirm:** delete whole docs, rewrite large sections, split/merge index structure, edit body text that contains numbers/boundary conditions, delete §0/§1.5/§2.5 sections
+- **On anomaly, fix now (no deferral):** doc anomalies found during compression—skipped/duplicated chapter numbers, duplicate subsection titles, broken tables, dangling § refs, disordered subsections, table/class/path names that look wrong vs code, unrepaired cross-doc duplication—must be fixed this round; do not defer with “hand to doc-update” or “handle next time.” Tiers: single-file fixes that do not renumber other sections (duplicate titles, broken tables, in-doc dangling refs) → subagent fixes directly; fixes that affect external refs (renumbering, subsection reorder, renames) → return to main agent, who greps whole-repo refs and fixes+syncs on the spot; factual doubts → verify against source (entity classes / @TableName / directory layout) then fix. Criteria and disposition table: guide chapter “Fix anomalies on discovery.”
 
-## 参考文件
+**Subagent model and quota-failure fallback (2026-09-05):** when dispatching Task, **default `model` inherits the parent session**; do not hardcode quota-hungry slugs for speed (specifying `composer-2.5` once caused a whole batch of `Increase limits` failures). If every parallel Task fails to start: ① immediately retry a small smoke shard on the default model; ② if still failing, main agent **degrades to serial**, prioritizing incidents/troubleshooting → research/evals → already-dense KBs/specs marked “reviewed, nothing compressible”; ③ close-out report must say “sharding failed; degraded,” and must not pretend parallel completed.
 
-| 文件 | 何时读 |
-|------|-------|
-| [`references/compression-guide.md`](references/compression-guide.md) | Step 5 执行前：压缩判据、文档类型压缩力度表、高频陷阱与修复脚本 |
-| [`references/standard.md`](references/standard.md) | Step 2 拿不准判定基准时：十一条标准完整说明、易变事实处理细则 |
-| [`scripts/audit.py`](scripts/audit.py) | Step 2 / Step 6 自动审计脚本（Python 跨平台，兼容 Windows，替换原 audit.sh） |
-| [`scripts/plan_shards.py`](scripts/plan_shards.py) | Step 5 分片方案计算：逐篇 token 估算、大 KB 判定、预算装箱（系数与预算常量见脚本头注释） |
+**Second-pass compression is normal:** for architecture KBs / specs / playbooks last compressed >30 days ago, many “reviewed, nothing compressible” results are a **valid conclusion**, not laziness. Do not delete field tables, curls, or thresholds just to inflate a compression ratio. Incident docs still use the troubleshooting intensity scale—not the same scale as KBs.
+
+**Docs compressed within the last 30 days** (trailing compact marker < 30 days old) are skipped by default; report as “recently compressed.” Drift protection when re-compressing is still needed (new content from code changes): see the guide.
+
+**Compact marker:** after each doc is processed, append `<!-- 该文档整理/压缩于 YYYY-MM-DD -->` at the true end of the file; batch script is in the guide.
+
+## Step 6 — Verify
+
+```bash
+# Step 2 baseline: audit.py <project-root> --save-metrics /tmp/dc-metrics.json
+# Step 6 verify:
+python3 scripts/audit.py <project-root> --compact-date <today YYYY-MM-DD> --compare-metrics /tmp/dc-metrics.json
+```
+
+Check I (compact-marker hard gate) **must show `压缩缺标识=0` / missing-marker count = 0** before close-out. Any unmarked doc = missed this round—finish marking and re-run. If the last full compact was < 30 days ago (most docs skipped in Step 5), the script’s “today’s marker” reading can false-alarm—the real gate is: every doc either has today’s marker or a marker from the last 30 days (i.e. “today’s markers ∪ last-30-day markers = full set”; main agent checks this), and only docs with neither are misses (established 2026-08-28 on mc-mdcrm).
+If check J comparison shows AGENTS.md estimated tokens above baseline, explain why in the close-out report (e.g. user explicitly asked to add content this round)—silent growth is not allowed.
+The 🔒 managed-block list must be confirmed still present verbatim in the close-out report, one by one.
+H’s `domain_map_present` / `backlog_present` must not flip True → False because of this audit.
+If STALE paths from audit I were cleaned in Step 5, verify should show 0; otherwise something was missed.
+
+**§0 TOC completeness:** docs using the KB template (`*_KNOWLEDGE_BASE.md`) should have `§0 目录索引` / TOC. Missing ones are **filled this round** (mechanically from headings—low risk, do directly); list them in the close-out report; do not defer.
+
+## Step 6.5 — Promote cross-project lessons to global (non-skippable)
+
+After compression and audit pass, **scan this product’s `docs/` (and cross-cutting sections in root AGENTS)** for lessons that still hold in other product repos:
+
+| Type | Typical landing (agentsync source of truth) |
+|------|-----------------------------------------------|
+| macOS menu bar / login silence / hide icon | `docs/MACOS_APP_DEVELOPMENT_GUIDE.md` |
+| System permissions / Automation / Apple Events | `_standards/.../macos-system-permissions.md` or a registered global-index specialty |
+| Distribution / notarization / Sparkle / Developer ID | `docs/APP_STORE_CHINA_LISTING_GUIDE.md` or an existing distribution guide |
+| Local proxy / Claude entry | `docs/MAC_PROXY_AGENT_GUIDE.md` |
+| Workspace / inherited injection / no `.git` | `docs/WORKSPACE_ORGANIZATION_GUIDE.md` |
+| Leak gate | `docs/LEAK_GATE_GUIDE.md` |
+| Other cross-product mechanisms | Create or extend matching `docs/*_GUIDE.md`, and add trigger words to the global `AGENTS.md` rule index |
+
+**Actions:** compare against global authority—if global is missing, write/extend; in the product repo, turn generic sections into “authority: global …; product-specific: …” pointers. Do not merely shorten reusable passages and leave them product-only. If they contradict global, do not rule unilaterally—list under close-out “pending user confirmation.”
+
+**This step is not optional:** user ruling 2026-09-05 requires doc governance to promote actively. Close-out reports must have a separate “promote to global” ledger (which docs written / skipped because already present / pending confirmation).
+
+## Safety boundaries
+
+- **Do not adjudicate content truth:** when two docs contradict and code evidence cannot decide, do not pick a winner—record in the report and ask the user. This is the only allowed “leave unfixed for the close-out report.” Difference from “fix on discovery”: anomalies verifiable via code/refs get fixed; contradictions that need a human call go upstairs
+- **Do not touch:** third-party/vendored projects, build artifacts, backup dirs, git worktrees
+
+## Reference files
+
+| File | When to read |
+|------|----------------|
+| [`references/compression-guide.md`](references/compression-guide.md) | Before Step 5: compression criteria, per-doc-type intensity table, common traps and fix scripts |
+| [`references/standard.md`](references/standard.md) | When Step 2 criteria are unclear: full eleven-standard explanation and volatile-fact handling |
+| [`scripts/audit.py`](scripts/audit.py) | Step 2 / Step 6 automated audit (includes check J and metrics baseline compare) |
+| [`scripts/plan_shards.py`](scripts/plan_shards.py) | Step 5 shard planning: per-doc token estimate, large-KB detection, budget packing (coefficients and budget constants in script header) |
