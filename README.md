@@ -6,7 +6,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Skills-5A67D8?logo=anthropic&logoColor=white)](https://claude.ai/code)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)](https://python.org)
 
-**Languages:** [English](#english) | [中文](#中文)
+**Languages:** [English](#english) | [中文](#中文) — skill bodies execute in English; Chinese mirrors are `*.zh-CN.md`
 
 ---
 
@@ -27,6 +27,15 @@ cp -r doc-skills/doc-init doc-skills/doc-compact doc-skills/doc-update ~/.claude
 ```
 
 Restart Claude Code. Each skill's entry point is its `SKILL.md`.
+
+
+### Language
+
+- **Execution source of truth** (`SKILL.md` and `references/`) is **English**.
+- Chinese mirrors live beside them as `*.zh-CN.md` (same content for Chinese authors/readers).
+- When these skills write project docs, they follow the project's existing documentation language and the user's language; if unclear, they default to **English**.
+- The injectable “Project Documentation Management” block is structure/navigation only (English v15+); it does not set comment or spoken language.
+
 
 ---
 
@@ -178,8 +187,11 @@ doc-compact/
     └── audit.py                    # mechanical audit (dead links, naming, markers)
 
 doc-update/
-└── SKILL.md
+├── SKILL.md                        # English execution entry
+└── SKILL.zh-CN.md                  # Chinese mirror
 ```
+
+Chinese mirrors (`*.zh-CN.md`) sit beside the English `SKILL.md` / `references/` files in every skill.
 
 ### License
 
@@ -204,6 +216,15 @@ cp -r doc-skills/doc-init doc-skills/doc-compact doc-skills/doc-update ~/.claude
 ```
 
 重启 Claude Code 即可，每个 skill 的入口是其 `SKILL.md`。
+
+
+### 语言说明
+
+- **执行真源**（`SKILL.md` 与 `references/`）为**英文**。
+- 中文对照为同目录 `*.zh-CN.md`。
+- 往项目里写文档时：跟随项目已有文档语言与用户语言；不明则默认英文。
+- 可注入的「项目文档管理」托管块只管结构/导航（英文 v15+），不管注释或对用户说话的语言。
+
 
 ---
 
