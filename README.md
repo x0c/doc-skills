@@ -1,6 +1,6 @@
 # doc-skills
 
-> **Claude Code Skills** for bootstrapping, compacting, and maintaining AI-readable project documentation — so coding agents stop re-discovering the same project context every session.
+Every new Claude Code session, your agent forgets the project and rediscovers it from scratch. These skills build a small, navigable project documentation system — a knowledge base the next agent can pick up cold.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Skills-5A67D8?logo=anthropic&logoColor=white)](https://claude.ai/code)
@@ -203,7 +203,9 @@ MIT
 
 ### 为什么需要它
 
-AI Coding Agent 每次接手项目都要重新摸清同一套上下文——哪个模块归谁管、哪些字段名不能按字面理解、哪些副作用代码里根本看不出来。`doc-skills` 把这些经验沉淀成一套小而精、可导航的文档体系，让任何 Agent 接手都能直接开工，并随代码演进持续保鲜。
+每次新开 Claude Code 会话，Agent 都会忘掉这个项目、从头再摸一遍。这套技能帮你建一套小而可导航的项目文档——下一任 Agent 冷启动就能接手的知识库。
+
+AI Coding Agent 每次接手都在重新发现：哪个模块归谁管、哪些字段名不能按字面理解、哪些副作用代码里根本看不出来。`doc-skills` 把这些经验沉淀成一套小而精、可导航的文档体系，让任何 Agent 接手都能直接开工，并随代码演进持续保鲜。
 
 ### 快速安装
 
